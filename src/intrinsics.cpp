@@ -97,6 +97,10 @@ static bool ilog2(CodeGen& cg, Expr* c, const std::string& t) { return unary_int
 
 static bool isaturate(CodeGen& cg, Expr* call, const std::string& target) {
     if (!check_args(call, 1)) return false;
+    // Try to fold saturate(expr) into the expr's final instruction.
+    if (cg.gen_fold_saturate(call->args[0], target))
+        return true;
+    // Fallback: mov_sat.
     std::vector<std::string> temps;
     Operand a;
     if (!cg.eval(call->args[0], a, temps)) return false;
@@ -184,7 +188,7 @@ static bool idot(CodeGen& cg, Expr* call, const std::string& target) {
     if (dim < 1) dim = 1;
     if (dim > 4) dim = 4;
     // dp2/dp3/dp4 read components in natural order; format with "xyzw" dst.
-    cg.emit(std::string("dp") + std::to_string(dim) + " " + target + ", " +
+    cg.emit(std::string("dp") + std::to_string(dim) + cg.sat_suffix() + " " + target + ", " +
             cg.fmt_operand(a, "xyzw") + ", " + cg.fmt_operand(b, "xyzw"));
     for (auto& t : temps) cg.sym.free_temp(t);
     return true;

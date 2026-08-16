@@ -82,12 +82,20 @@ public:
     // Format an evaluated operand (register or immediate) against a dest mask.
     std::string fmt_operand(const Operand& op, const std::string& dst_mask) const;
 
+    // Attempt to fold saturate(expr) into the expr's final instruction
+    // (e.g. mul_sat). Returns true if folded; caller falls back to mov_sat.
+    bool gen_fold_saturate(Expr* arg, const std::string& target_str);
+
     // Dest mask from a target string ("r5.xy" -> "xy").
     static std::string target_mask_of(const std::string& target);
 
     const std::string& error() const { return error_; }
 
     SymbolTable& sym;
+
+    // Current instruction saturate fold state (set while lowering saturate(expr)).
+    bool fold_sat_ = false;
+    std::string sat_suffix() const { return fold_sat_ ? "_sat" : ""; }
 
     // Custom function expansion hook (set by the Translator for
     // HLSLFunctionImport libraries). Returns true on success, false if the

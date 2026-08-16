@@ -303,6 +303,27 @@ bool CodeGen::gen_assignment(Expr* e, const std::string& target_str) {
     return gen_internal(e, target_str);
 }
 
+bool CodeGen::gen_fold_saturate(Expr* arg, const std::string& target) {
+    // Comparison: already returns 1.0/0.0, saturate is a no-op.
+    if (arg->kind == Expr::Kind::CmpOp)
+        return gen_internal(arg, target);
+    bool foldable = false;
+    if (arg->kind == Expr::Kind::BinOp) {
+        foldable = (arg->op == "+" || arg->op == "-" || arg->op == "*" || arg->op == "/");
+    } else if (arg->kind == Expr::Kind::VarRef || arg->kind == Expr::Kind::ConstVec ||
+               arg->kind == Expr::Kind::UnaryOp) {
+        foldable = true;
+    } else if (arg->kind == Expr::Kind::Call && arg->name == "dot") {
+        foldable = true;
+    }
+    if (!foldable)
+        return false;
+    fold_sat_ = true;
+    bool ok = gen_internal(arg, target);
+    fold_sat_ = false;
+    return ok;
+}
+
 bool CodeGen::gen_internal(Expr* e, const std::string& target_str) {
     if (!e) { error_ = "null expression"; return false; }
     switch (e->kind) {
@@ -312,7 +333,7 @@ bool CodeGen::gen_internal(Expr* e, const std::string& target_str) {
         std::string dm = target_mask_of(target_str);
         std::string sm = e->mask.empty() ? s->mask : e->mask;
         std::string src = format_src(s->reg, sm, dm);
-        emit("mov " + target_str + ", " + src);
+        emit(std::string("mov") + sat_suffix() + " " + target_str + ", " + src);
         return true;
     }
     case Expr::Kind::ConstVec: {
@@ -322,7 +343,7 @@ bool CodeGen::gen_internal(Expr* e, const std::string& target_str) {
         std::string tbase = target_str.substr(0, target_str.find('.'));
         Symbol* t = sym.find_by_reg(tbase);
         bool int_target = t && (t->type.is_int() || t->type.is_uint() || t->type.is_bool());
-        emit("mov " + target_str + ", " +
+        emit(std::string("mov") + sat_suffix() + " " + target_str + ", " +
              (int_target ? format_imm_int(e->elems, dm) : format_imm(e->elems, dm)));
         return true;
     }
@@ -369,9 +390,11 @@ bool CodeGen::gen_binop(Expr* e, const std::string& target_str) {
         std::string ls = fmt_operand(l, dm);
         std::string imm = int_ctx ? ("l(" + std::to_string((long long)c) + ")")
                                   : ("l(" + format_float(c) + ")");
-        if (op == "+") emit((int_ctx ? "iadd " : "add ") + target_str + ", " + ls + ", " + imm);
-        else if (op == "-") emit((int_ctx ? "iadd " : "add ") + target_str + ", " + ls + ", -" + imm);
-        else if (op == "*") emit((int_ctx ? "imul " : "mul ") + target_str + ", " + ls + ", " + imm);
+        std::string a = int_ctx ? "iadd" : ("add" + sat_suffix());
+        std::string m = int_ctx ? "imul" : ("mul" + sat_suffix());
+        if (op == "+") emit(a + " " + target_str + ", " + ls + ", " + imm);
+        else if (op == "-") emit(a + " " + target_str + ", " + ls + ", -" + imm);
+        else if (op == "*") emit(m + " " + target_str + ", " + ls + ", " + imm);
         else if (op == "&" || op == "&&") emit("and " + target_str + ", " + ls + ", " + imm);
         else if (op == "|" || op == "||") emit("or " + target_str + ", " + ls + ", " + imm);
         else if (op == "^") emit("xor " + target_str + ", " + ls + ", " + imm);
@@ -402,10 +425,10 @@ bool CodeGen::gen_binop(Expr* e, const std::string& target_str) {
     std::string rs = fmt(r);
 
     std::string mnem;
-    if (op == "+") mnem = both_int ? "iadd" : "add";
-    else if (op == "-") mnem = both_int ? "iadd" : "add";
-    else if (op == "*") mnem = both_int ? "imul" : "mul";
-    else if (op == "/") mnem = both_int ? (is_uint ? "udiv" : "idiv") : "div";
+    if (op == "+") mnem = (both_int ? "iadd" : ("add" + sat_suffix()));
+    else if (op == "-") mnem = (both_int ? "iadd" : ("add" + sat_suffix()));
+    else if (op == "*") mnem = (both_int ? "imul" : ("mul" + sat_suffix()));
+    else if (op == "/") mnem = (both_int ? (is_uint ? "udiv" : "idiv") : ("div" + sat_suffix()));
     else if (op == "%") mnem = both_int ? (is_uint ? "umod" : "imod") : "?";
     else if (op == "||" || op == "|") mnem = "or";
     else if (op == "&&" || op == "&") mnem = "and";
@@ -416,7 +439,7 @@ bool CodeGen::gen_binop(Expr* e, const std::string& target_str) {
 
     if (op == "-") {
         // sub with immediate source is restricted; use add with negated.
-        emit("add " + target_str + ", " + ls + ", -" + rs);
+        emit("add" + sat_suffix() + " " + target_str + ", " + ls + ", -" + rs);
     } else {
         emit(mnem + " " + target_str + ", " + ls + ", " + rs);
     }
@@ -458,7 +481,7 @@ bool CodeGen::gen_unary(Expr* e, const std::string& target_str) {
     std::vector<std::string> temps;
     Operand src;
     if (!eval(e->operand, src, temps)) return false;
-    emit("mov " + target_str + ", -" + fmt_operand(src, dm));
+    emit(std::string("mov") + sat_suffix() + " " + target_str + ", -" + fmt_operand(src, dm));
     for (auto& t : temps) sym.free_temp(t);
     return true;
 }
