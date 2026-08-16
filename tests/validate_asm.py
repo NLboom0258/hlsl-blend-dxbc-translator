@@ -14,6 +14,7 @@ EXPECTED = {
     'max': 3, 'min': 3, 'mov': 2, 'mov_sat': 2, 'movc': 4, 'mul': 3,
     'mul_sat': 3, 'ne': 3, 'not': 2, 'or': 3, 'rcp': 2, 'round_ne': 2,
     'round_ni': 2, 'round_pi': 2, 'round_z': 2, 'rsq': 2, 'sample': 4,
+    'sample_b': 5, 'sample_c': 5, 'sample_d': 6,
     'sincos': 3, 'sqrt': 2, 'udiv': 3, 'uge': 3, 'ult': 3, 'umod': 3,
     'ushr': 3, 'utof': 2, 'xor': 3,
 }

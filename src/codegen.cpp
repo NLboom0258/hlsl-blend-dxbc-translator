@@ -596,6 +596,20 @@ bool CodeGen::gen_sample(Expr* e, const std::string& target_str) {
         if (!eval(e->false_expr, ref, temps)) return false;
         std::string ref_s = fmt_operand(ref, "x");
         emit("sample_c " + target_str + ", " + uv_s + ", " + tex->reg + ".xyzw, " + samp->reg + ", " + ref_s);
+    } else if (e->sample_kind == 3) {
+        // SampleBias: sample_b dst, uv, tex, sampler, bias
+        Operand bias;
+        if (!eval(e->false_expr, bias, temps)) return false;
+        std::string bias_s = fmt_operand(bias, "x");
+        emit("sample_b " + target_str + ", " + uv_s + ", " + tex->reg + ".xyzw, " + samp->reg + ", " + bias_s);
+    } else if (e->sample_kind == 4) {
+        // SampleGrad: sample_d dst, uv, tex, sampler, gradx, grady
+        Operand gx, gy;
+        if (!eval(e->false_expr, gx, temps)) return false;
+        if (!eval(e->left, gy, temps)) return false;
+        std::string gx_s = fmt_operand(gx, "x");
+        std::string gy_s = fmt_operand(gy, "x");
+        emit("sample_d " + target_str + ", " + uv_s + ", " + tex->reg + ".xyzw, " + samp->reg + ", " + gx_s + ", " + gy_s);
     } else {
         emit("sample " + target_str + ", " + uv_s + ", " + tex->reg + ".xyzw, " + samp->reg);
     }

@@ -83,6 +83,21 @@ HLSLSnippet {
 EOF
 check "采样 Sample/SampleLevel/SampleCmp" "$TMP/t_sample.txt"
 
+# sampling variants: bias/grad
+cat > "$TMP/t_sample2.txt" << 'EOF'
+HLSLTexture Texture2D Tex = t0;
+HLSLSampler SamplerState Samp = s0;
+HLSL float2 UV = float2(0.5, 0.5);
+HLSL float Bias = 0.5;
+HLSL float2 GradX = float2(0.1, 0.1);
+HLSL float2 GradY = float2(0.2, 0.2);
+HLSLSnippet {
+    float4 A = Tex.SampleBias(Samp, UV, Bias);
+    float4 B = Tex.SampleGrad(Samp, UV, GradX, GradY);
+}
+EOF
+check "采样 SampleBias/SampleGrad" "$TMP/t_sample2.txt"
+
 # functions + any/all + discard
 cat > "$TMP/t_func.txt" << 'EOF'
 HLSLFunctionImport "functions/lib.txt";

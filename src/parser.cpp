@@ -235,6 +235,54 @@ Expr* Parser::parse_postfix() {
                 e = s;
                 continue;
             }
+            if (ident == "SampleBias" && is_punct("(")) {
+                // tex.SampleBias(sampler, uv, bias) -> sample_b
+                ++pos_;
+                Expr* sampler = parse_ternary();
+                if (!sampler) return nullptr;
+                if (!expect_punct(",")) return nullptr;
+                Expr* uv = parse_ternary();
+                if (!uv) return nullptr;
+                if (!expect_punct(",")) return nullptr;
+                Expr* bias = parse_ternary();
+                if (!bias) return nullptr;
+                if (!expect_punct(")")) return nullptr;
+                Expr* s = arena_.alloc();
+                s->kind = Expr::Kind::Sample;
+                s->name = e->name;
+                s->sampler_expr = sampler;
+                s->uv_expr = uv;
+                s->false_expr = bias;
+                s->sample_kind = 3;
+                e = s;
+                continue;
+            }
+            if (ident == "SampleGrad" && is_punct("(")) {
+                // tex.SampleGrad(sampler, uv, gradx, grady) -> sample_d
+                ++pos_;
+                Expr* sampler = parse_ternary();
+                if (!sampler) return nullptr;
+                if (!expect_punct(",")) return nullptr;
+                Expr* uv = parse_ternary();
+                if (!uv) return nullptr;
+                if (!expect_punct(",")) return nullptr;
+                Expr* gx = parse_ternary();
+                if (!gx) return nullptr;
+                if (!expect_punct(",")) return nullptr;
+                Expr* gy = parse_ternary();
+                if (!gy) return nullptr;
+                if (!expect_punct(")")) return nullptr;
+                Expr* s = arena_.alloc();
+                s->kind = Expr::Kind::Sample;
+                s->name = e->name;
+                s->sampler_expr = sampler;
+                s->uv_expr = uv;
+                s->false_expr = gx;
+                s->left = gy;
+                s->sample_kind = 4;
+                e = s;
+                continue;
+            }
             Expr* m = arena_.alloc();
             m->kind = Expr::Kind::Member;
             m->operand = e;
