@@ -56,6 +56,7 @@ private:
     bool translate_if(Stmt* s, const std::string& indent, std::string& error);
     bool translate_while(Stmt* s, const std::string& indent, std::string& error);
     bool translate_for(Stmt* s, const std::string& indent, std::string& error);
+    bool translate_switch(Stmt* s, const std::string& indent, std::string& error);
     bool gen_condition(Expr* cond, std::string& cond_reg, std::string& error);
     bool expand_function_call(Expr* call, const std::string& target, std::string& error);
 

@@ -384,6 +384,8 @@ Stmt* Parser::parse_statement_inner() {
     if (is_ident("while")) return parse_while();
     if (is_ident("for")) return parse_for();
 
+    if (is_ident("switch")) return parse_switch();
+
     if (is_ident("return")) {
         ++pos_;
         Stmt* s = stmt_arena_.alloc();
@@ -545,6 +547,43 @@ Stmt* Parser::parse_for() {
         if (!one) return nullptr;
         s->body.push_back(one);
     }
+    return s;
+}
+
+Stmt* Parser::parse_switch() {
+    ++pos_; // switch
+    if (!expect_punct("(")) return nullptr;
+    Expr* cond = parse_ternary();
+    if (!cond) return nullptr;
+    if (!expect_punct(")")) return nullptr;
+    if (!expect_punct("{")) return nullptr;
+    Stmt* s = stmt_arena_.alloc();
+    s->kind = Stmt::Kind::Switch;
+    s->cond = cond;
+    while (!is_punct("}")) {
+        if (at_end()) { set_error("unterminated switch"); return nullptr; }
+        Stmt::CaseEntry ce;
+        if (is_ident("case")) {
+            ++pos_;
+            ce.value = parse_ternary();
+            if (!ce.value) return nullptr;
+            if (!expect_punct(":")) return nullptr;
+        } else if (is_ident("default")) {
+            ++pos_;
+            if (!expect_punct(":")) return nullptr;
+        } else {
+            set_error("expected case or default in switch");
+            return nullptr;
+        }
+        while (!is_punct("}") && !is_ident("case") && !is_ident("default")) {
+            if (at_end()) { set_error("unterminated switch case"); return nullptr; }
+            Stmt* body_stmt = parse_statement_inner();
+            if (!body_stmt) return nullptr;
+            ce.body.push_back(body_stmt);
+        }
+        s->cases.push_back(ce);
+    }
+    ++pos_; // }
     return s;
 }
 

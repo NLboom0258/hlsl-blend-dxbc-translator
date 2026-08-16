@@ -109,6 +109,7 @@ struct Stmt {
         Break,
         Continue,
         Discard,       // discard;
+        Switch,        // switch (cond) { case v: ... default: ... }
         Nop,
     };
 
@@ -129,6 +130,13 @@ struct Stmt {
     std::vector<Stmt*> for_init;   // For
     Stmt* for_step = nullptr;      // For
 
+    // Switch
+    struct CaseEntry {
+        Expr* value = nullptr;      // case constant (nullptr = default)
+        std::vector<Stmt*> body;
+    };
+    std::vector<CaseEntry> cases;
+
     const char* kind_name() const {
         switch (kind) {
         case Kind::Decl: return "Decl";
@@ -143,6 +151,7 @@ struct Stmt {
         case Kind::Break: return "Break";
         case Kind::Continue: return "Continue";
         case Kind::Discard: return "Discard";
+        case Kind::Switch: return "Switch";
         case Kind::Nop: return "Nop";
         }
         return "?";

@@ -623,6 +623,8 @@ bool Translator::translate_stmt(Stmt* s, const std::string& indent, std::string&
     case Stmt::Kind::Discard:
         out_->push_back(indent + "discard");
         return true;
+    case Stmt::Kind::Switch:
+        return translate_switch(s, indent, error);
     case Stmt::Kind::Nop:
         return true;
     }
@@ -734,6 +736,28 @@ bool Translator::translate_for(Stmt* s, const std::string& indent, std::string& 
     if (s->for_step)
         if (!translate_stmt(s->for_step, indent + "  ", error)) return false;
     out_->push_back(indent + "endloop");
+    return true;
+}
+
+bool Translator::translate_switch(Stmt* s, const std::string& indent, std::string& error) {
+    std::string cond_reg;
+    if (!gen_condition(s->cond, cond_reg, error)) return false;
+    out_->push_back(indent + "switch " + cond_reg);
+    for (auto& ce : s->cases) {
+        if (ce.value) {
+            if (ce.value->kind != Expr::Kind::ConstVec) {
+                error = "switch case must be a constant";
+                return false;
+            }
+            long long v = (long long)ce.value->elems[0];
+            out_->push_back(indent + "case l(" + std::to_string(v) + ")");
+        } else {
+            out_->push_back(indent + "default");
+        }
+        for (Stmt* cs : ce.body)
+            if (!translate_stmt(cs, indent + "  ", error)) return false;
+    }
+    out_->push_back(indent + "endswitch");
     return true;
 }
 

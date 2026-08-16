@@ -67,6 +67,7 @@ private:
     Stmt* parse_if();
     Stmt* parse_while();
     Stmt* parse_for();
+    Stmt* parse_switch();
     Stmt* parse_decl_or_assign();
     bool looks_like_type_name(const std::string& ident) const;
 };
