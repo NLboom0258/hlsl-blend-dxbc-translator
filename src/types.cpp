@@ -1,6 +1,8 @@
 // types.cpp
 #include "types.h"
 
+#include <cstdlib>
+
 namespace hb {
 
 bool parse_type_name(const std::string& name, Type& out) {

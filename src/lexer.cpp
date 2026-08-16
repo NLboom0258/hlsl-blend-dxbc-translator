@@ -2,6 +2,8 @@
 #include "lexer.h"
 
 #include <cctype>
+#include <cstdlib>
+#include <cstring>
 
 namespace hb {
 
