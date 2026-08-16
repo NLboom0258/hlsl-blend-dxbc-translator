@@ -65,7 +65,13 @@ Python 版只支持 float/float2/3/4 + 基本运算。C++ 版扩展了:
 
 ## 遇到的问题 / 待用户决定
 
-(暂无 —— 自主运行期间遇到会记录在这里)
+### ⚠️ 你的 shader 文件里有潜在 bug(翻译器正确报告,未崩溃)
+- **文件**:`强制开启接触阴影的关卡全局光照shader88d1a2e189df03f6-ps.txt` 第 550 行
+- **问题**:声明的是 `OffsetDirShadowUV1`(第 549 行 `HLSL float2 OffsetDirShadowUV1 = OffsetShadowUV(...)`),
+  但紧接着 `DXBCMov r16.xy, OffsetDirShadowUV2` 用的是 `OffsetDirShadowUV2` —— 这个变量从未声明(疑似 UV1/UV2 复制粘贴笔误)。
+- **我的翻译器行为**:与 Python 版一致,该行输出 `// Error: DXBCMov: variable not defined: OffsetDirShadowUV2` 注释,其余继续翻译,不崩溃。
+- **建议**:如果这是笔误,把 `OffsetDirShadowUV2` 改成 `OffsetDirShadowUV1`,或补一个 `HLSLMov float2 OffsetDirShadowUV2 = ...`。改完后这行就能正确翻译。
+- (Python 版同样会在此报错,这是原文件的问题,不是 C++ 版引入的。)
 
 ## 参考位置备忘
 
