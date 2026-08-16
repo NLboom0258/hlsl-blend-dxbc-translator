@@ -287,15 +287,33 @@ bool CodeGen::gen_assignment(Expr* e, const std::string& target_str) {
             size_t k = tmask.find(c);
             inv.push_back("xyzw"[k]);
         }
+        size_t dot = target_str.find('.');
+        std::string tbase = dot == std::string::npos ? target_str : target_str.substr(0, dot);
+
+        // Simple source (variable/constant): emit the inverted mov directly,
+        // matching how fxc lowers "r.zyx = a.xyz" -> "mov r.xyz, a.zyxz".
+        if (e->kind == Expr::Kind::VarRef || e->kind == Expr::Kind::ConstVec) {
+            Swizzle inv_sw = compute_src_swizzle(inv, legal);
+            std::string src;
+            if (e->kind == Expr::Kind::VarRef) {
+                Symbol* s = sym.lookup(e->name);
+                if (!s) { error_ = "variable not defined: " + e->name; return false; }
+                src = s->reg + "." + swizzle_to_string(inv_sw);
+            } else {
+                src = format_imm(e->elems, legal);
+            }
+            emit("mov " + tbase + "." + legal + ", " + src);
+            return true;
+        }
+
+        // Complex expression: materialize into a temp, then invert.
         std::vector<std::string> temps;
         std::string tmp_mask = std::string("xyzw").substr(0, legal.size());
         std::string temp = alloc_temp(tmp_mask, temps);
         if (!gen_internal(e, temp)) return false;
-        size_t dot = target_str.find('.');
-        std::string tbase = dot == std::string::npos ? target_str : target_str.substr(0, dot);
-        size_t tdot = temp.find('.');
-        std::string tbase_temp = tdot == std::string::npos ? temp : temp.substr(0, tdot);
-        emit("mov " + tbase + "." + legal + ", " + tbase_temp + "." + inv);
+        std::string tbase_temp = temp.substr(0, temp.find('.'));
+        Swizzle inv_sw = compute_src_swizzle(inv, legal);
+        emit("mov " + tbase + "." + legal + ", " + tbase_temp + "." + swizzle_to_string(inv_sw));
         for (auto& tb : temps) sym.free_temp(tb);
         return true;
     }
