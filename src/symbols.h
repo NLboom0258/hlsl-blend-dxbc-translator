@@ -25,6 +25,8 @@ public:
 
     Symbol* lookup(const std::string& name);
     bool exists(const std::string& name) const;
+    // Lookup only in the current (innermost) scope.
+    Symbol* lookup_current_scope(const std::string& name);
     // Find a variable bound to the given register base (e.g. "r5"), innermost scope.
     Symbol* find_by_reg(const std::string& reg_base);
 

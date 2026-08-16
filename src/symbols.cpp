@@ -24,6 +24,11 @@ bool SymbolTable::exists(const std::string& name) const {
     return false;
 }
 
+Symbol* SymbolTable::lookup_current_scope(const std::string& name) {
+    auto f = scopes_.back().find(name);
+    return f == scopes_.back().end() ? nullptr : &f->second;
+}
+
 Symbol* SymbolTable::find_by_reg(const std::string& reg_base) {
     for (auto it = scopes_.rbegin(); it != scopes_.rend(); ++it) {
         for (auto& kv : *it) {

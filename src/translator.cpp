@@ -638,7 +638,10 @@ bool Translator::translate_stmt(Stmt* s, const std::string& indent, std::string&
 
 bool Translator::translate_decl(Stmt* s, const std::string& indent, std::string& error) {
     std::string name = s->name;
-    Symbol* existing = symtab_->lookup(name);
+    // Only a declaration in the *current* scope is a redeclare; a name that
+    // exists only in an outer scope (e.g. a function-local shadowing a caller
+    // variable) must allocate a fresh register.
+    Symbol* existing = symtab_->lookup_current_scope(name);
     if (existing) {
         // redeclare in same scope: treat as assignment
         if (s->init) {
