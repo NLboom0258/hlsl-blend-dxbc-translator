@@ -477,11 +477,12 @@ bool CodeGen::gen_unary(Expr* e, const std::string& target_str) {
     const std::string& op = e->op;
 
     if (op == "!") {
-        // logical not: eq dst, src, l(0)
+        // logical not: eq dst, src, l(0); eq returns 0/all-ones, normalize.
         std::vector<std::string> temps;
         Operand src;
         if (!eval(e->operand, src, temps)) return false;
         emit("eq " + target_str + ", " + fmt_operand(src, dm) + ", l(0.0)");
+        emit("and " + target_str + ", " + target_str + ", l(0x3f800000)");
         for (auto& t : temps) sym.free_temp(t);
         return true;
     }

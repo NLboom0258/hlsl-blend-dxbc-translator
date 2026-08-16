@@ -138,11 +138,8 @@ static bool icos(CodeGen& cg, Expr* call, const std::string& target);
 
 static bool isincos(CodeGen& cg, Expr* call, const std::string& target) {
     // HLSL sincos(angle, out_sin, out_cos)  ->  args[0]=angle, args[1]=sin, args[2]=cos
-    // DXBC: sincos dst_sin, src, dst_cos
-    // To keep output identical to the proven-working Python-rule translator
-    // (sincos <arg2>, <arg0>, <arg1> => sin->arg2, cos->arg1), emit that form.
-    // The golden-angle spiral used by this project is invariant to the sin/cos
-    // swap, so this matches the reference and renders correctly.
+    // DXBC sincos dst_sin, src, dst_cos  ->  emit: sincos <arg1>, <arg0>, <arg2>
+    // (matches the HLSL/fxc semantics: sin -> second arg, cos -> third arg)
     if (!check_args(call, 3)) return false;
     std::vector<std::string> temps;
     Operand angle, sin_dst, cos_dst;
@@ -153,9 +150,8 @@ static bool isincos(CodeGen& cg, Expr* call, const std::string& target) {
     auto dest_form = [](const Operand& o) -> std::string {
         return o.is_immediate ? std::string("r?") : o.reg + "." + (o.mask.empty() ? "x" : o.mask);
     };
-    // dst_sin = arg2, src = arg0 (angle), dst_cos = arg1
-    cg.emit("sincos " + dest_form(cos_dst) + ", " + cg.fmt_operand(angle, "x") + ", " +
-            dest_form(sin_dst));
+    cg.emit("sincos " + dest_form(sin_dst) + ", " + cg.fmt_operand(angle, "x") + ", " +
+            dest_form(cos_dst));
     for (auto& t : temps) cg.sym.free_temp(t);
     return true;
 }
@@ -470,7 +466,9 @@ static bool isign(CodeGen& cg, Expr* call, const std::string& target) {
     std::string lt = cg.alloc_temp(dm, temps);
     std::string gt = cg.alloc_temp(dm, temps);
     cg.emit("lt " + lt + ", " + cg.fmt_operand(x, dm) + ", l(0.0)");
+    cg.emit("and " + lt + ", " + lt + ", l(0x3f800000)");
     cg.emit("gt " + gt + ", " + cg.fmt_operand(x, dm) + ", l(0.0)");
+    cg.emit("and " + gt + ", " + gt + ", l(0x3f800000)");
     cg.emit("movc " + t + ", " + cg.format_src(lt.substr(0, lt.find('.')), dm, dm) + ", l(-1.0), l(0.0)");
     cg.emit("movc " + target + ", " + cg.format_src(gt.substr(0, gt.find('.')), dm, dm) + ", l(1.0), " + cg.format_src(tb, dm, dm));
     for (auto& tt : temps) cg.sym.free_temp(tt);
