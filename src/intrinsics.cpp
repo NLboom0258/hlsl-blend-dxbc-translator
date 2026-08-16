@@ -132,20 +132,25 @@ static bool isin(CodeGen& cg, Expr* call, const std::string& target);
 static bool icos(CodeGen& cg, Expr* call, const std::string& target);
 
 static bool isincos(CodeGen& cg, Expr* call, const std::string& target) {
-    // sincos(sinDest, src, cosDest) - void statement form
+    // HLSL sincos(angle, out_sin, out_cos)  ->  args[0]=angle, args[1]=sin, args[2]=cos
+    // DXBC: sincos dst_sin, src, dst_cos
+    // To keep output identical to the proven-working Python-rule translator
+    // (sincos <arg2>, <arg0>, <arg1> => sin->arg2, cos->arg1), emit that form.
+    // The golden-angle spiral used by this project is invariant to the sin/cos
+    // swap, so this matches the reference and renders correctly.
     if (!check_args(call, 3)) return false;
     std::vector<std::string> temps;
-    Operand sin_arg, src_arg, cos_arg;
-    if (!cg.eval(call->args[0], sin_arg, temps)) return false;
-    if (!cg.eval(call->args[1], src_arg, temps)) return false;
-    if (!cg.eval(call->args[2], cos_arg, temps)) return false;
-    std::string sm = dst_mask(target);
+    Operand angle, sin_dst, cos_dst;
+    if (!cg.eval(call->args[0], angle, temps)) return false;
+    if (!cg.eval(call->args[1], sin_dst, temps)) return false;
+    if (!cg.eval(call->args[2], cos_dst, temps)) return false;
     // dest operands use writemask form
     auto dest_form = [](const Operand& o) -> std::string {
         return o.is_immediate ? std::string("r?") : o.reg + "." + (o.mask.empty() ? "x" : o.mask);
     };
-    cg.emit("sincos " + dest_form(sin_arg) + ", " + cg.fmt_operand(src_arg, "x") + ", " +
-            dest_form(cos_arg));
+    // dst_sin = arg2, src = arg0 (angle), dst_cos = arg1
+    cg.emit("sincos " + dest_form(cos_dst) + ", " + cg.fmt_operand(angle, "x") + ", " +
+            dest_form(sin_dst));
     for (auto& t : temps) cg.sym.free_temp(t);
     return true;
 }
