@@ -1,0 +1,186 @@
+rule normalize
+    input: Val1
+    float2:
+        dp2 Temp1.x, Val1, Val1
+        rsq Temp1.x, Temp1.x
+        mul Output, Val1, Temp1.x
+    float3:
+        dp3 Temp1.x, Val1, Val1
+        rsq Temp1.x, Temp1.x
+        mul Output, Val1, Temp1.x
+    float4:
+        dp4 Temp1.x, Val1, Val1
+        rsq Temp1.x, Temp1.x
+        mul Output, Val1, Temp1.x
+end
+
+rule cross
+    input: Val1, Val2
+    float3:
+        mov Temp1.xyz, Val1
+        mov Temp2.xyz, Val2
+        mul Output, Temp1.yzx, Temp2.zxy
+        mad Output, -Temp1.zxy, Temp2.yzx, Output
+end
+
+rule dot
+    input: Val1, Val2
+    float2:
+        dp2 Output, Val1, Val2
+    float3:
+        dp3 Output, Val1, Val2
+    float4:
+        dp4 Output, Val1, Val2
+end
+
+rule add
+    input: Val1, Val2
+    add Output, Val1, Val2
+end
+
+rule sub
+    input: Val1, Val2
+    add Output, Val1, -Val2
+end
+
+rule mul
+    input: Val1, Val2
+    mul Output, Val1, Val2
+end
+
+rule div
+    input: Val1, Val2
+    div Output, Val1, Val2
+end
+
+rule max
+    input: Val1, Val2
+    max Output, Val1, Val2
+end
+
+rule min
+    input: Val1, Val2
+    min Output, Val1, Val2
+end
+
+rule clamp
+    input: Val1, Val2, Val3
+    min Temp1, Val1, Val3
+    max Output, Temp1, Val2
+end
+
+rule saturate
+    input: Val1
+    min Temp1, Val1, l(1.0)
+    max Output, Temp1, l(0.0)
+end
+
+rule step
+    input: Val1, Val2
+    ge Temp1, Val2, Val1
+    min Output, Temp1, l(1.0)
+end
+
+rule smoothstep
+    input: Val1, Val2, Val3
+    add Temp1, Val3, -Val1
+    add Temp2, Val2, -Val1
+    div Temp1, Temp1, Temp2
+    min Temp1, Temp1, l(1.0)
+    max Temp1, Temp1, l(0.0)
+    mul Temp2, Temp1, Temp1
+    mul Output, Temp1, l(2.0)
+    add Output, l(3.0), -Output
+    mul Output, Temp2, Output
+end
+
+rule gt
+    input: Val1, Val2
+    lt Temp1, Val2, Val1
+    min Output, Temp1, l(1.0)
+end
+
+rule lt
+    input: Val1, Val2
+    lt Temp1, Val1, Val2
+    min Output, Temp1, l(1.0)
+end
+
+rule ge
+    input: Val1, Val2
+    ge Temp1, Val1, Val2
+    min Output, Temp1, l(1.0)
+end
+
+rule le
+    input: Val1, Val2
+    ge Temp1, Val2, Val1
+    min Output, Temp1, l(1.0)
+end
+
+rule eq
+    input: Val1, Val2
+    eq Temp1, Val1, Val2
+    min Output, Temp1, l(1.0)
+end
+
+rule ne
+    input: Val1, Val2
+    ne Temp1, Val1, Val2
+    min Output, Temp1, l(1.0)
+end
+
+rule length
+    input: Val1
+    float2:
+        dp2 Temp1, Val1, Val1
+        sqrt Output, Temp1
+    float3:
+        dp3 Temp1, Val1, Val1
+        sqrt Output, Temp1
+    float4:
+        dp4 Temp1, Val1, Val1
+        sqrt Output, Temp1
+end
+
+rule abs
+    input: Val1
+    max Output, Val1, -Val1
+end
+
+rule sqrt
+    input: Val1
+    sqrt Output, Val1
+end
+
+rule lerp
+    input: Val1, Val2, Val3
+    add Temp1, Val2, -Val1
+    mad Output, Temp1, Val3, Val1
+end
+
+rule pow
+    input: Val1, Val2
+    log Temp1, Val1
+    mul Temp1, Temp1, Val2
+    exp Output, Temp1
+end
+
+rule sincos
+    void
+    input: Val1, Val2, Val3
+    float:
+        sincos Val3, Val1, Val2
+end
+
+rule sin
+    input: Val1
+    float:
+        sincos Temp1.x, Val1, Output
+end
+
+rule cos
+    input: Val1
+    float:
+        sincos Output, Val1, Temp1.x
+end

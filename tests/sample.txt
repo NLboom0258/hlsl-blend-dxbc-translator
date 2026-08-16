@@ -1,0 +1,58 @@
+// 原始 DXBC 汇编行（应原样保留）
+mul r0.xyz, v1.xyz, v1.www
+
+// HLSLMov 绑定：将寄存器映射为 HLSL 变量
+HLSLMov float3 Bitangent = r0.xyz;
+HLSLMov float3 Tangent = v0.xyz;
+HLSLMov float3 LightDirCB = cb5[0].xyz;
+
+// 单行 HLSL 函数调用（交叉积）
+HLSL float3 Normal = cross(Bitangent.xyz, Tangent);
+
+// 多行 HLSL 片段（包含各种运算和控制流）
+HLSLSnippet {
+    // 注释测试：各类注释应被正确剥离
+    float3 LightDir.yzx = normalize(float3(0, 1, -1))/* 块注释 */; // 行注释
+    float NdotL = dot(Normal.xyz, LightDir.xyz);
+
+    // 非声明式赋值（标量常量直接赋值，应生成简洁的立即数）
+    LightDir.yzx = 1.0;
+
+    // 声明并初始化标量
+    float Test = 0.0;
+
+    // 复合赋值测试
+    if (NdotL > 0.0)
+    {
+        NdotL *= 2.0;          // 右侧标量立即数，应优化为 mul rX, rY, l(2.0)
+        Test = 1.0 + 3.0;      // 两个立即数相加，应直接生成 add rX, l(1.0), l(3.0)
+        LightDir.yzx = LightDir.yzx - 0.5; // 复合赋值展开为 LightDir.yzx = LightDir.yzx - 0.5
+    }
+
+    // 除法测试（标量除以标量）
+    float InvNdotL = 1.0 / NdotL;
+
+    // 混合类型运算：向量与标量
+    float3 ScaledLight = LightDir.xyz * 0.5;
+
+    // 嵌套表达式： (a + b) * c
+    float Complex = (Test + 2.0) * NdotL;
+    
+    // 加减乘除混合长逻辑测试
+    Test = NdotL + Test - 1.0 * 2.0 / InvNdotL;
+    
+    // max测试
+    Test = max(NdotL, Test);
+}
+
+// step、smoothstep测试
+HLSLSnippet {
+    float edge = 0.5;
+    float3 weights = float3(0.2, 0.6, 0.9);
+    float3 stepped = step(edge, weights);
+    float3 smooth = smoothstep(0.3, 0.7, weights);
+}
+
+// 赋值写回测试
+DXBCMov r0.xyz, Normal
+DXBCMov r1.y, Test

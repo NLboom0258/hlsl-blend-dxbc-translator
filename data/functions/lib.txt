@@ -1,0 +1,250 @@
+float3 GetToonNoL(float Smoothness, float3 Normal, float3 LightDir)
+{
+    float ToonNoL = dot(normalize(Normal), normalize(-LightDir));
+    ToonNoL = smoothstep(-Smoothness, Smoothness, ToonNoL);
+    return ToonNoL;
+}
+
+void LightDirBlend(inout float3 LightDirSum, inout float TotalWeight, float VisibilityFactor, float BaseWeight, float3 PointLightDir)
+{
+    // 最终权重 = 基础权重 × 朝向调制因子
+    float weight = BaseWeight * VisibilityFactor;
+    
+    // 累积光照向量
+    LightDirSum += PointLightDir * weight;
+    // 累积权重
+    TotalWeight += TotalWeight + weight;
+}
+
+float3 ToonLightSpeculer(float3 ilmMap, float3 LightColor, float intensity, float SpeculerHardness, float3 LightDir, float3 Normal, float3 CameraDirVector, float3 CameraVector)
+{    
+    // 半角向量
+    float HalfVector = saturate(dot(normalize(normalize(-LightDir) * 2 + CameraVector * 7), Normal));
+    
+    // fresnel_spec
+    float RimSpecSize = 1.0;
+    float eVecDif = dot(Normal, CameraDirVector);
+    float fresnel_spec = 1 - eVecDif;
+    fresnel_spec = pow(fresnel_spec, 5);
+    fresnel_spec *= saturate(ilmMap.x - 0.75) * 8 * RimSpecSize;
+    
+    // Specular
+    float Specular = clamp(pow(abs(HalfVector) + fresnel_spec, 4), 0.0, 0.99);
+    
+    // Speculer_Area
+    float FrontSpecSize = 1.0;
+    //float Speculer_Area = step(1 - ilmMap.z, Specular * FrontSpecSize); // 纯硬高光，没有软过渡，更不受金属度控制
+    
+    float Speculer_Area = saturate(1 - ilmMap.y * SpeculerHardness);
+    //float Speculer_Area = saturate(1 - 1.0 * SpeculerHardness);
+    Speculer_Area = smoothstep(1 - ilmMap.z - Speculer_Area, 1 - ilmMap.z + Speculer_Area, Specular * FrontSpecSize);
+    
+    // Speculer_Color
+    float3 Speculer_Color = saturate(LightColor * intensity * ilmMap.x) * Speculer_Area;
+    
+    return Speculer_Color;
+}
+
+float3 ToonRimLight(float3 LightColor, float3 Normal, float3 CameraVector, float3 LightDir)
+{
+    float eVecDif = dot(Normal, CameraVector);
+    float NdotL = GetToonNoL(1, Normal, LightDir);
+    
+    float eVecDif_rim = smoothstep(0.5, 1.0, NdotL) * 0.5 + 1;
+    
+    // 混合内边缘光和综合边缘光(混合暗部固有边缘光加上按视角和光照方向点乘结果控制显示的等宽边缘光)
+    float3 RimLight = smoothstep(0.65, 0.6, eVecDif_rim - pow(1 - eVecDif, 2));
+    float InnerRimMask = (1 - smoothstep(0.5, 0.75, NdotL)) * RimLight;
+    RimLight = smoothstep(0.65, 0.6, 1 - pow(1 - eVecDif, 2));
+    float OverallRimMask = dot(CameraVector, LightDir) * RimLight;
+    
+    RimLight = max(OverallRimMask, InnerRimMask);
+    RimLight *= LightColor;
+    
+    return RimLight;
+}
+
+float3 GetMatCap(Texture2D MatCapTex, float4 MatcapOffset, SamplerState Sampler, float3 CameraVector, float3 CameraUpDirVector, float3 Normal)
+{
+    float2 MatcapUV;
+    float3 CameraRightVector = normalize(cross(CameraVector.xzy, CameraUpDirVector.xzy));
+    float3 CameraUpVector = cross(CameraVector.xzy, CameraRightVector);
+    MatcapUV.x = dot(CameraRightVector.xyz, Normal.xyz);
+    MatcapUV.y = dot(CameraUpVector, Normal);
+    
+    MatcapUV *= MatcapOffset.xy;
+    MatcapUV += MatcapOffset.zw;
+    
+    float3 MatCap = MatCapTex.Sample(Sampler, MatcapUV);
+    
+    return MatCap;
+}
+
+float2 OffsetShadowUV(float2 originalUV, float sampleIndex, float totalSamples, float blurRadius, float2 TexSize)
+{
+    float GoldenAngle = 2.39996323;
+
+    // 黄金角螺旋生成归一化偏移量 [0,1]
+    float radius = sqrt((sampleIndex + 1.0) / totalSamples);
+    float theta = GoldenAngle * sampleIndex;
+    float2 offset;
+    sincos(theta, offset.y, offset.x);
+    offset *= radius;
+
+    // 从纹素偏移转换为UV偏移，并应用模糊半径
+    offset *= blurRadius / TexSize;
+
+    // 偏移原UV并限制在[0,1]内
+    float2 sampleUV = originalUV + offset;
+    sampleUV = saturate(sampleUV);
+    return sampleUV;
+}
+
+float2 GetGoldenSpiralOffset(float sampleIndex, float totalSamples, float radiusScale)
+{
+    float GoldenAngle = 2.39996323;
+    float radius = sqrt((sampleIndex + 1.0) / totalSamples) * radiusScale; // radiusScale 可调模糊强度
+    float theta = GoldenAngle * sampleIndex;
+    float2 offset;
+    sincos(theta, offset.y, offset.x);
+    offset *= radius;
+    return offset;
+}
+
+float3 MatCapSelect(float MatCapID, Texture2D MatCapTex0, Texture2D MatCapTex1, Texture2D MatCapTex2, Texture2D MatCapTex3, Texture2D MatCapTex4, Texture2D MatCapTex5, Texture2D MatCapTex6, Texture2D MatCapTex7, Texture2D MatCapTex8, Texture2D MatCapTex9, SamplerState Sampler, float2 MatcapUV)
+{
+    // 根据ID选择从10个MatCap中采样指定的MatCap
+    float3 MatCap;
+    if (MatCapID < 0.05) {
+        MatCap = 0;
+    }
+    else
+    {
+        if (MatCapID < 0.15) {
+            MatCap = MatCapTex0.Sample(Sampler, MatcapUV);
+        }
+        else
+        {
+            if (MatCapID < 0.25) {
+                MatCap = MatCapTex1.Sample(Sampler, MatcapUV);
+            }
+            else
+            {
+                if (MatCapID < 0.35) {
+                    MatCap = MatCapTex2.Sample(Sampler, MatcapUV);
+                }
+                else
+                {
+                    if (MatCapID < 0.45) {
+                        MatCap = MatCapTex3.Sample(Sampler, MatcapUV);
+                    }
+                    else
+                    {
+                        if (MatCapID < 0.55) {
+                            MatCap = MatCapTex4.Sample(Sampler, MatcapUV);
+                        }
+                        else
+                        {
+                            if (MatCapID < 0.65) {
+                                MatCap = MatCapTex5.Sample(Sampler, MatcapUV);
+                            }
+                            else
+                            {
+                                if (MatCapID < 0.75) {
+                                    MatCap = MatCapTex6.Sample(Sampler, MatcapUV);
+                                }
+                                else
+                                {
+                                    if (MatCapID < 0.85) {
+                                        MatCap = MatCapTex7.Sample(Sampler, MatcapUV);
+                                    }
+                                    else
+                                    {
+                                        if (MatCapID < 0.95) {
+                                            MatCap = MatCapTex8.Sample(Sampler, MatcapUV);
+                                        }
+                                        else
+                                        {
+                                            MatCap = MatCapTex9.Sample(Sampler, MatcapUV);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    return MatCap;
+}
+
+float4 MatMapSelect(float MaterialID, Texture2D IlmMapTex0, Texture2D IlmMapTex1, Texture2D IlmMapTex2, Texture2D IlmMapTex3, Texture2D IlmMapTex4, Texture2D IlmMapTex5, Texture2D IlmMapTex6, Texture2D IlmMapTex7, Texture2D IlmMapTex8, Texture2D IlmMapTex9, Texture2D IlmMapTex10, SamplerState Sampler, float2 UV)
+{
+    // 根据材质索引ID选择从11个IlmMap中采样指定的IlmMap(现在改为处理所有材质纹理)
+    float4 IlmMap;
+    if (MaterialID < 0.05) {
+        IlmMap = IlmMapTex0.Sample(Sampler, UV);
+    }
+    else
+    {
+        if (MaterialID < 0.15) {
+            IlmMap = IlmMapTex1.Sample(Sampler, UV);
+        }
+        else
+        {
+            if (MaterialID < 0.25) {
+                IlmMap = IlmMapTex2.Sample(Sampler, UV);
+            }
+            else
+            {
+                if (MaterialID < 0.35) {
+                    IlmMap = IlmMapTex3.Sample(Sampler, UV);
+                }
+                else
+                {
+                    if (MaterialID < 0.45) {
+                        IlmMap = IlmMapTex4.Sample(Sampler, UV);
+                    }
+                    else
+                    {
+                        if (MaterialID < 0.55) {
+                            IlmMap = IlmMapTex5.Sample(Sampler, UV);
+                        }
+                        else
+                        {
+                            if (MaterialID < 0.65) {
+                                IlmMap = IlmMapTex6.Sample(Sampler, UV);
+                            }
+                            else
+                            {
+                                if (MaterialID < 0.75) {
+                                    IlmMap = IlmMapTex7.Sample(Sampler, UV);
+                                }
+                                else
+                                {
+                                    if (MaterialID < 0.85) {
+                                        IlmMap = IlmMapTex8.Sample(Sampler, UV);
+                                    }
+                                    else
+                                    {
+                                        if (MaterialID < 0.95) {
+                                            IlmMap = IlmMapTex9.Sample(Sampler, UV);
+                                        }
+                                        else
+                                        {
+                                            IlmMap = IlmMapTex10.Sample(Sampler, UV);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    return IlmMap;
+}
