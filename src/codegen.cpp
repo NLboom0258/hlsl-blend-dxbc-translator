@@ -253,12 +253,19 @@ bool CodeGen::eval(Expr* e, Operand& op, std::vector<std::string>& temps) {
     }
     default: {
         // Complex expression: materialize into a fresh temp register.
+        // A saturate fold must only apply to the outermost instruction that
+        // writes the final target; nested sub-expressions evaluated into temps
+        // must NOT inherit the _sat modifier (otherwise "saturate(a*b*c)"
+        // would wrongly become saturate(saturate(a*b)*c)).
+        bool saved_sat = fold_sat_;
+        fold_sat_ = false;
         int dim = infer_dim(e);
         if (dim < 1) dim = 1;
         std::string mask = "xyzw";
         if (dim <= 4 && dim >= 1) mask = std::string("xyzw").substr(0, (size_t)dim);
         std::string temp = alloc_temp(mask, temps);
-        if (!gen_internal(e, temp)) return false;
+        if (!gen_internal(e, temp)) { fold_sat_ = saved_sat; return false; }
+        fold_sat_ = saved_sat;
         op.reg = temp.substr(0, temp.find('.'));
         op.mask = mask;
         op.dim = dim;
