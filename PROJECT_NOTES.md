@@ -35,7 +35,7 @@ Python 版只支持 float/float2/3/4 + 基本运算。C++ 版扩展了:
 - **类型**:int/uint/bool(含位运算 & | ^ << >> ~、整数比较 ilt/ige/ieq、uint→float 用 utof)
 - **控制流**:for/while 循环(loop/breakc/endloop)、switch/case/default、discard、break/continue
 - **运算**:i++/i--、后置自增、常量折叠(负号/构造向量/整数幂)
-- **采样**:SampleLevel(sample_l)、SampleCmp(sample_c, 深度比较)
+- **采样**:SampleLevel(sample_l)、SampleCmp(sample_c, 深度比较)、SampleBias(sample_b)、SampleGrad(sample_d)
 - **intrinsic 补充**:any()/all()、ddx/ddy、rcp、radians/degrees、isnan/isfinite、fmod、sign、select、round/floor/ceil/trunc/frc
 - **质量优化**:smoothstep 用 mad(仿 fxc)、pow 常量整数幂展开、**saturate 折叠到前序指令**
       (mul_sat/add_sat/dp3_sat,比较直接输出,无法折叠的回退 mov_sat —— M2 输出 1721→1689 行)
