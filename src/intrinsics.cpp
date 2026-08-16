@@ -312,16 +312,18 @@ static bool ismoothstep(CodeGen& cg, Expr* call, const std::string& target) {
     if (dm.empty()) dm = "xyzw";
     std::string t1 = cg.alloc_temp(dm, temps);
     std::string t2 = cg.alloc_temp(dm, temps);
+    std::string t3 = cg.alloc_temp(dm, temps);
     std::string t1b = t1.substr(0, t1.find('.'));
     std::string t2b = t2.substr(0, t2.find('.'));
+    std::string t3b = t3.substr(0, t3.find('.'));
+    // t = clamp((x-lo)/(hi-lo), 0, 1); result = t*t*(3-2t)
     cg.emit("add " + t1 + ", " + cg.fmt_operand(x, dm) + ", -" + cg.fmt_operand(lo, dm));
     cg.emit("add " + t2 + ", " + cg.fmt_operand(hi, dm) + ", -" + cg.fmt_operand(lo, dm));
     cg.emit("div " + t1 + ", " + cg.format_src(t1b, dm, dm) + ", " + cg.format_src(t2b, dm, dm));
     cg.emit("mov_sat " + t1 + ", " + cg.format_src(t1b, dm, dm));
-    cg.emit("mul " + t2 + ", " + cg.format_src(t1b, dm, dm) + ", " + cg.format_src(t1b, dm, dm));
-    cg.emit("mul " + target + ", " + cg.format_src(t1b, dm, dm) + ", l(2.0)");
-    cg.emit("add " + target + ", l(3.0), -" + target);
-    cg.emit("mul " + target + ", " + cg.format_src(t2b, dm, dm) + ", " + target);
+    cg.emit("mad " + t2 + ", " + cg.format_src(t1b, dm, dm) + ", l(-2.0), l(3.0)");  // 3-2t
+    cg.emit("mul " + t3 + ", " + cg.format_src(t1b, dm, dm) + ", " + cg.format_src(t1b, dm, dm));  // t^2
+    cg.emit("mul " + target + ", " + cg.format_src(t3b, dm, dm) + ", " + cg.format_src(t2b, dm, dm));
     for (auto& tt : temps) cg.sym.free_temp(tt);
     return true;
 }
@@ -344,6 +346,32 @@ static bool ilerp(CodeGen& cg, Expr* call, const std::string& target) {
 
 static bool ipow(CodeGen& cg, Expr* call, const std::string& target) {
     if (!check_args(call, 2)) return false;
+    // Constant small integer exponent: expand to repeated multiplication
+    // (matches DXC/fxc for pow(x, 2/3/4)).
+    if (call->args[1]->kind == Expr::Kind::ConstVec && call->args[1]->elems.size() == 1) {
+        double p = call->args[1]->elems[0];
+        int n = (int)p;
+        if (p == (double)n && n >= 1 && n <= 4) {
+            std::vector<std::string> temps;
+            Operand x;
+            if (!cg.eval(call->args[0], x, temps)) return false;
+            std::string dm = dst_mask(target);
+            if (n == 1) {
+                cg.emit("mov " + target + ", " + cg.fmt_operand(x, dm));
+            } else if (n == 2) {
+                cg.emit("mul " + target + ", " + cg.fmt_operand(x, dm) + ", " + cg.fmt_operand(x, dm));
+            } else {
+                std::string acc = cg.alloc_temp(dm, temps);
+                std::string accb = acc.substr(0, acc.find('.'));
+                cg.emit("mul " + acc + ", " + cg.fmt_operand(x, dm) + ", " + cg.fmt_operand(x, dm));
+                for (int i = 2; i < n; ++i)
+                    cg.emit("mul " + acc + ", " + cg.format_src(accb, dm, dm) + ", " + cg.fmt_operand(x, dm));
+                cg.emit("mov " + target + ", " + cg.format_src(accb, dm, dm));
+            }
+            for (auto& tt : temps) cg.sym.free_temp(tt);
+            return true;
+        }
+    }
     std::vector<std::string> temps;
     Operand x, y;
     if (!cg.eval(call->args[0], x, temps)) return false;
