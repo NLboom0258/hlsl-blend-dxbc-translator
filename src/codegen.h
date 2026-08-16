@@ -76,6 +76,8 @@ public:
                            const std::string& dst_mask) const;
     // Format an immediate from a const vector, aligned to dst mask.
     std::string format_imm(const std::vector<double>& vals, const std::string& dst_mask) const;
+    // Format an immediate as integer literals (for int/uint operations).
+    std::string format_imm_int(const std::vector<double>& vals, const std::string& dst_mask) const;
     std::string format_imm_scalar(double v) const;
     // Format an evaluated operand (register or immediate) against a dest mask.
     std::string fmt_operand(const Operand& op, const std::string& dst_mask) const;

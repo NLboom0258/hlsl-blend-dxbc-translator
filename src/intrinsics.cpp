@@ -436,6 +436,37 @@ static bool imov(CodeGen& cg, Expr* call, const std::string& target) {
     return true;
 }
 
+// Reduce a vector to a scalar bool via or/and chain.
+static bool reduce_bool(CodeGen& cg, Expr* call, const std::string& target, const char* op) {
+    if (!check_args(call, 1)) return false;
+    std::vector<std::string> temps;
+    Operand a;
+    if (!cg.eval(call->args[0], a, temps)) return false;
+    std::string mask = a.is_immediate ? "x" : a.mask;
+    if (mask.empty()) mask = "x";
+    if (mask.size() <= 1) {
+        cg.emit("mov " + target + ", " + cg.fmt_operand(a, "x"));
+    } else {
+        std::string acc = cg.alloc_temp("x", temps);
+        std::string accb = acc.substr(0, acc.find('.'));
+        cg.emit(std::string(op) + " " + acc + ", " + cg.format_src(a.reg, std::string(1, mask[0]), "x") +
+                ", " + cg.format_src(a.reg, std::string(1, mask[1]), "x"));
+        for (size_t i = 2; i < mask.size(); ++i)
+            cg.emit(std::string(op) + " " + acc + ", " + cg.format_src(accb, "x", "x") + ", " +
+                    cg.format_src(a.reg, std::string(1, mask[i]), "x"));
+        cg.emit("mov " + target + ", " + cg.format_src(accb, "x", "x"));
+    }
+    for (auto& t : temps) cg.sym.free_temp(t);
+    return true;
+}
+
+static bool iany(CodeGen& cg, Expr* call, const std::string& target) {
+    return reduce_bool(cg, call, target, "or");
+}
+static bool iall(CodeGen& cg, Expr* call, const std::string& target) {
+    return reduce_bool(cg, call, target, "and");
+}
+
 // ---------------------------------------------------------------------------
 // Table
 // ---------------------------------------------------------------------------
@@ -477,6 +508,8 @@ const std::vector<std::pair<std::string, IntrinsicInfo>>& intrinsic_table() {
         {"round", {iround, "float", 1}},
         {"sign", {isign, "float", 1}},
         {"select", {iselect, "float", 3}},
+        {"any", {iany, "bool", 1}},
+        {"all", {iall, "bool", 1}},
         {"and", {iand, "uint", 2}},
         {"or", {ior, "uint", 2}},
         {"xor", {ixor, "uint", 2}},

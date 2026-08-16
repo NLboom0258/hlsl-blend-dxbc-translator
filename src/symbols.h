@@ -25,6 +25,8 @@ public:
 
     Symbol* lookup(const std::string& name);
     bool exists(const std::string& name) const;
+    // Find a variable bound to the given register base (e.g. "r5"), innermost scope.
+    Symbol* find_by_reg(const std::string& reg_base);
 
     // Allocate a temp register with the given writemask. Returns "rN.mask".
     std::string alloc_temp(const std::string& mask);

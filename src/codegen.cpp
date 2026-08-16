@@ -31,6 +31,38 @@ std::string CodeGen::format_imm_scalar(double v) const {
     return "l(" + format_float(v) + ")";
 }
 
+std::string CodeGen::format_imm_int(const std::vector<double>& vals, const std::string& dst_mask) const {
+    if (vals.empty())
+        return "l(0)";
+    if (vals.size() == 1)
+        return "l(" + std::to_string((long long)vals[0]) + ")";
+    double comp[4] = {0, 0, 0, 0};
+    std::string dm = dst_mask.empty() ? "xyzw" : dst_mask;
+    int n = (int)vals.size();
+    int used = std::min(n, (int)dm.size());
+    for (int i = 0; i < used; ++i) {
+        int idx = mask_index_of(dm[i]);
+        if (idx >= 0) comp[idx] = vals[i];
+    }
+    double last = vals.back();
+    for (int i = 0; i < (int)dm.size(); ++i) {
+        int idx = mask_index_of(dm[i]);
+        if (idx >= 0) {
+            bool occupied = false;
+            for (int j = 0; j < used; ++j)
+                if (mask_index_of(dm[j]) == idx) { occupied = true; break; }
+            if (!occupied) comp[idx] = last;
+        }
+    }
+    std::string s = "l(";
+    for (int i = 0; i < 4; ++i) {
+        if (i) s += ", ";
+        s += std::to_string((long long)comp[i]);
+    }
+    s += ")";
+    return s;
+}
+
 std::string CodeGen::format_imm(const std::vector<double>& vals, const std::string& dst_mask) const {
     if (vals.empty())
         return "l(0.0)";
@@ -284,7 +316,13 @@ bool CodeGen::gen_internal(Expr* e, const std::string& target_str) {
     }
     case Expr::Kind::ConstVec: {
         std::string dm = target_mask_of(target_str);
-        emit("mov " + target_str + ", " + format_imm(e->elems, dm));
+        // If the destination register holds an int/uint/bool variable, store
+        // the literal with integer bits (l(42)) rather than float bits.
+        std::string tbase = target_str.substr(0, target_str.find('.'));
+        Symbol* t = sym.find_by_reg(tbase);
+        bool int_target = t && (t->type.is_int() || t->type.is_uint() || t->type.is_bool());
+        emit("mov " + target_str + ", " +
+             (int_target ? format_imm_int(e->elems, dm) : format_imm(e->elems, dm)));
         return true;
     }
     case Expr::Kind::BinOp: return gen_binop(e, target_str);
@@ -315,6 +353,9 @@ bool CodeGen::gen_binop(Expr* e, const std::string& target_str) {
     std::string dm = target_mask_of(target_str);
     const std::string& op = e->op;
 
+    bool bitwise = (op == "&" || op == "|" || op == "^" || op == "<<" || op == ">>" ||
+                    op == "&&" || op == "||");
+
     // Scalar immediate on the right: emit compact immediate form.
     if (e->right->kind == Expr::Kind::ConstVec && e->right->elems.size() == 1 &&
         op != "/" && op != "%") {
@@ -323,24 +364,17 @@ bool CodeGen::gen_binop(Expr* e, const std::string& target_str) {
         if (!eval(e->left, l, temps)) return false;
         double c = e->right->elems[0];
         std::string ls = fmt_operand(l, dm);
-        if (op == "+")
-            emit("add " + target_str + ", " + ls + ", l(" + format_float(c) + ")");
-        else if (op == "-")
-            emit("add " + target_str + ", " + ls + ", -l(" + format_float(c) + ")");
-        else if (op == "*")
-            emit("mul " + target_str + ", " + ls + ", l(" + format_float(c) + ")");
-        else if (op == "||")
-            emit("or " + target_str + ", " + ls + ", l(" + format_float(c) + ")");
-        else if (op == "&&")
-            emit("and " + target_str + ", " + ls + ", l(" + format_float(c) + ")");
-        else if (op == "<<")
-            emit("ishl " + target_str + ", " + ls + ", l(" + format_float(c) + ")");
-        else if (op == ">>")
-            emit("ishr " + target_str + ", " + ls + ", l(" + format_float(c) + ")");
-        else {
-            error_ = "unsupported binary op with scalar constant: " + op;
-            return false;
-        }
+        std::string imm = bitwise ? ("l(" + std::to_string((long long)c) + ")")
+                                  : ("l(" + format_float(c) + ")");
+        if (op == "+") emit("add " + target_str + ", " + ls + ", " + imm);
+        else if (op == "-") emit("add " + target_str + ", " + ls + ", -" + imm);
+        else if (op == "*") emit("mul " + target_str + ", " + ls + ", " + imm);
+        else if (op == "&" || op == "&&") emit("and " + target_str + ", " + ls + ", " + imm);
+        else if (op == "|" || op == "||") emit("or " + target_str + ", " + ls + ", " + imm);
+        else if (op == "^") emit("xor " + target_str + ", " + ls + ", " + imm);
+        else if (op == "<<") emit("ishl " + target_str + ", " + ls + ", " + imm);
+        else if (op == ">>") emit("ishr " + target_str + ", " + ls + ", " + imm);
+        else { error_ = "unsupported binary op with scalar constant: " + op; return false; }
         for (auto& t : temps) sym.free_temp(t);
         return true;
     }
@@ -349,37 +383,37 @@ bool CodeGen::gen_binop(Expr* e, const std::string& target_str) {
     Operand l, r;
     if (!eval(e->left, l, temps)) return false;
     if (!eval(e->right, r, temps)) return false;
-    std::string ls = fmt_operand(l, dm);
-    std::string rs = fmt_operand(r, dm);
+
+    Type lt = infer_type(e->left), rt = infer_type(e->right);
+    bool both_int = bitwise || ((lt.is_int() || lt.is_uint() || lt.is_bool()) &&
+                                (rt.is_int() || rt.is_uint() || rt.is_bool()));
+    bool is_uint = lt.is_uint() || rt.is_uint();
+
+    // Format operands; use integer immediates for int/bitwise ops.
+    auto fmt = [&](const Operand& o) -> std::string {
+        if (o.is_immediate)
+            return both_int ? format_imm_int(o.vals, dm) : format_imm(o.vals, dm);
+        return format_src(o.reg, o.mask, dm);
+    };
+    std::string ls = fmt(l);
+    std::string rs = fmt(r);
 
     std::string mnem;
-    bool is_uint = false;
-    Type lt = infer_type(e->left), rt = infer_type(e->right);
-    bool both_int = (lt.is_int() || lt.is_uint() || lt.is_bool()) &&
-                    (rt.is_int() || rt.is_uint() || rt.is_bool());
-    is_uint = lt.is_uint() || rt.is_uint();
-
     if (op == "+") mnem = both_int ? "iadd" : "add";
     else if (op == "-") mnem = both_int ? "iadd" : "add";
     else if (op == "*") mnem = both_int ? "imul" : "mul";
     else if (op == "/") mnem = both_int ? (is_uint ? "udiv" : "idiv") : "div";
     else if (op == "%") mnem = both_int ? (is_uint ? "umod" : "imod") : "?";
-    else if (op == "||") mnem = "or";
-    else if (op == "&&") mnem = "and";
-    else if (op == "|") mnem = "or";
-    else if (op == "&") mnem = "and";
+    else if (op == "||" || op == "|") mnem = "or";
+    else if (op == "&&" || op == "&") mnem = "and";
     else if (op == "^") mnem = "xor";
     else if (op == "<<") mnem = "ishl";
-    else if (op == ">>") mnem = both_int && is_uint ? "ushr" : "ishr";
+    else if (op == ">>") mnem = (is_uint ? "ushr" : "ishr");
     else { error_ = "unsupported binary op: " + op; return false; }
 
     if (op == "-") {
         // sub with immediate source is restricted; use add with negated.
-        if (r.is_immediate) {
-            emit("add " + target_str + ", " + ls + ", -" + rs);
-        } else {
-            emit("add " + target_str + ", " + ls + ", -" + rs);
-        }
+        emit("add " + target_str + ", " + ls + ", -" + rs);
     } else {
         emit(mnem + " " + target_str + ", " + ls + ", " + rs);
     }
@@ -512,7 +546,7 @@ bool CodeGen::gen_sample(Expr* e, const std::string& target_str) {
     Operand uv;
     if (!eval(e->uv_expr, uv, temps)) return false;
     std::string uv_s = fmt_operand(uv, dm);
-    emit("sample " + target_str + ", " + uv_s + ", " + tex->reg + ", " + samp->reg);
+    emit("sample " + target_str + ", " + uv_s + ", " + tex->reg + ".xyzw, " + samp->reg);
     for (auto& t : temps) sym.free_temp(t);
     return true;
 }
@@ -530,7 +564,8 @@ bool CodeGen::gen_cast(Expr* e, const std::string& target_str) {
     else if (from == BaseType::Float && to == BaseType::Int) mnem = "ftoi";
     else if (from == BaseType::Float && to == BaseType::Uint) mnem = "ftou";
     else if (from == BaseType::Float && to == BaseType::Bool) mnem = "mov";
-    else if (to == BaseType::Float && (from == BaseType::Int || from == BaseType::Uint)) mnem = "itof";
+    else if (from == BaseType::Int && to == BaseType::Float) mnem = "itof";
+    else if (from == BaseType::Uint && to == BaseType::Float) mnem = "utof";
     else if (from == BaseType::Int && to == BaseType::Uint) mnem = "mov";
     else if (from == BaseType::Uint && to == BaseType::Int) mnem = "mov";
     else if (to == BaseType::Bool) mnem = "mov";

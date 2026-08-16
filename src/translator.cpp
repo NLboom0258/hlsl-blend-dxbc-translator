@@ -620,6 +620,9 @@ bool Translator::translate_stmt(Stmt* s, const std::string& indent, std::string&
     case Stmt::Kind::Continue:
         out_->push_back(indent + "continue");
         return true;
+    case Stmt::Kind::Discard:
+        out_->push_back(indent + "discard");
+        return true;
     case Stmt::Kind::Nop:
         return true;
     }

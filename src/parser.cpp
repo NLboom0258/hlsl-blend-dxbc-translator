@@ -290,6 +290,7 @@ Expr* Parser::parse_primary() {
         Expr* e = arena_.alloc();
         e->kind = Expr::Kind::ConstVec;
         e->elems.push_back(cur().num);
+        e->int_literal = cur().is_int;
         ++pos_;
         return e;
     }
@@ -383,6 +384,13 @@ Stmt* Parser::parse_statement_inner() {
         expect_punct(";");
         Stmt* s = stmt_arena_.alloc();
         s->kind = Stmt::Kind::Continue;
+        return s;
+    }
+    if (is_ident("discard")) {
+        ++pos_;
+        expect_punct(";");
+        Stmt* s = stmt_arena_.alloc();
+        s->kind = Stmt::Kind::Discard;
         return s;
     }
 

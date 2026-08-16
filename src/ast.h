@@ -38,6 +38,7 @@ struct Expr {
     std::string mask;       // VarRef swizzle ("xyz"), may be empty
 
     std::vector<double> elems;  // ConstVec
+    bool int_literal = false;   // ConstVec: came from an integer literal (for int immediates)
 
     std::string op;         // BinOp / UnaryOp / CmpOp operator string
     std::vector<Expr*> args; // Call / Construct / Index
@@ -106,6 +107,7 @@ struct Stmt {
         Block,         // { stmts }
         Break,
         Continue,
+        Discard,       // discard;
         Nop,
     };
 
@@ -139,6 +141,7 @@ struct Stmt {
         case Kind::Block: return "Block";
         case Kind::Break: return "Break";
         case Kind::Continue: return "Continue";
+        case Kind::Discard: return "Discard";
         case Kind::Nop: return "Nop";
         }
         return "?";
