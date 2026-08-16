@@ -12,22 +12,30 @@
 ## 最新状态
 
 **会话开始时间**:2026-08-16
-**当前阶段**:核心管线完成 + 功能增强中,已验证格式兼容性 ✅
+**当前阶段**:核心完成 + 功能增强 + 全面验证 ✅(等待用户游戏内最终测试)
 
 阶段进度:
 - [x] 通读 Python 源码、规则、测试样例;确认构建环境与 DXC 位置
-- [x] 搭建 C++ 项目骨架(src/ 模块化、vcxproj、MSBuild)
+- [x] 搭建 C++ 项目骨架(src/ 模块化、vcxproj、MSBuild + CMake 双构建)
 - [x] 核心模型(types/swizzle/AST)、词法+语法解析器、符号表+寄存器分配
-- [x] intrinsic 表(~50 内置函数)+ codegen、translator 主循环(全部 8 标记)
-- [x] 函数库展开、纹理采样、if/else/while/for 控制流
-- [x] 三个真实 shader(M2全局光照/星见雅modx2)零错误翻译
-- [x] **格式验证**:49 个生成助记符全部在真实 3Dmigoto 反汇编集合内;操作数结构验证器全通过
-- [x] **健壮性**:56 个 ShaderFixes + 604 个 ShaderCache 文件零崩溃;纯 DXBC 透传逐字节一致
-- [x] **功能增强**:int/uint 位运算(& | ^ << >> + 整数立即数位模式)、int 比较指令(ilt/ige/ieq)、
-      uint→float 用 utof、any()/all()、discard、i++/i--、SampleLevel(sample_l)、常量折叠
-- [ ] 待做:switch 语句、sample_c(深度比较采样)、更多 intrinsic、向量动态索引
-- [ ] **最终验证(需用户)**:在 DMC5 游戏中实际加载测试(3Dmigoto 汇编器没有独立 CLI,
-      我已通过格式对比+结构验证确认兼容性,但游戏内加载是最权威验证)
+- [x] intrinsic 表(~60 内置函数)+ codegen、translator 主循环(全部 8 标记)
+- [x] 函数库展开、纹理采样、if/else/while/for/switch 控制流
+- [x] 三个真实 shader 零错误翻译;56 ShaderFixes + 604 ShaderCache 零崩溃
+- [x] 格式验证:助记符全在 3Dmigoto 集合内 + 结构验证 + **fxc 交叉验证**(normalize/dot/saturate/ternary/clamp/exp/log/sincos/cross 与微软编译器一致)
+- [x] 功能增强(详见下方「扩展语法」)
+- [x] 可移植性:MSVC + MinGW/g++ 双编译器构建通过
+- [ ] **最终验证(需用户)**:在 DMC5 游戏中实际加载(3Dmigoto 汇编器无独立 CLI,已用格式对比+fxc 交叉验证确认兼容性,但游戏内加载是最权威测试)
+
+## 扩展语法(相比 Python 版新增,用户可放心使用)
+
+Python 版只支持 float/float2/3/4 + 基本运算。C++ 版扩展了:
+- **类型**:int/uint/bool(含位运算 & | ^ << >> ~、整数比较 ilt/ige/ieq、uint→float 用 utof)
+- **控制流**:for/while 循环(loop/breakc/endloop)、switch/case/default、discard、break/continue
+- **运算**:i++/i--、后置自增、常量折叠(负号/构造向量/整数幂)
+- **采样**:SampleLevel(sample_l)、SampleCmp(sample_c, 深度比较)
+- **intrinsic 补充**:any()/all()、ddx/ddy、rcp、radians/degrees、isnan/isfinite、fmod、sign、select、round/floor/ceil/trunc/frc
+- **质量优化**:smoothstep 用 mad(仿 fxc)、pow 常量整数幂展开、**saturate 折叠到前序指令**
+      (mul_sat/add_sat/dp3_sat,比较直接输出,无法折叠的回退 mov_sat —— M2 输出 1721→1689 行)
 
 ## 关键决定(用户已知晓/授权)
 
