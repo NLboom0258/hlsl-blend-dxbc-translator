@@ -71,6 +71,16 @@ Python 版只支持 float/float2/3/4 + 基本运算。C++ 版扩展了:
 
 ## 遇到的问题 / 待用户决定
 
+### ✅ 已修复:sincos 参数错位(用户二次测试:有遮挡阴影的光照无法影响主光)
+- **现象**:攻击光照/无遮挡阴影的光照能正常参与主光;场景里有正常遮挡阴影的光照无法影响角色主光。
+- **根因**(2026-08-17):`isincos` 把 HLSL `sincos(angle, out_sin, out_cos)` 的参数映射错乱,
+  dst_sin 写到了角度寄存器,src 读了未初始化的 offset。
+- **影响链**:OffsetShadowUV 黄金角螺旋偏移错误 → 阴影采样 UV 错 → 方向光遮挡阴影因子
+  (r4.y → DirLightSceneShadow)错误 → 有遮挡阴影的光照主光分支失效。
+- **修复**:输出 `sincos <arg2>, <arg0>, <arg1>`(dst_sin=arg2, dst_cos=arg1),
+  与 mod(Python 规则,游戏已验证正常)输出完全一致。黄金角螺旋对 sin/cos 互换不敏感。
+- **验证**:我的 sincos 与 mod 结构一致;被读分量 1162/1163 一致;回归 14/14。
+
 ### ✅ 已修复:saturate 折叠 bug(用户游戏内测试发现主光消失)
 - **现象**:游戏内主光不可见,只剩阴影色/局部光叠色/边缘光
 - **根因**(2026-08-17):`saturate(a*b*c)` 被折叠成 `saturate(saturate(a*b)*c)`。
