@@ -63,6 +63,10 @@ def main():
                 continue
             if stripped in ('else', 'endif', 'loop', 'endloop', 'ret', 'break', 'continue', 'discard'):
                 continue
+            if stripped in ('switch', 'endswitch', 'default'):
+                continue
+            if re.match(r'^case l\(', stripped):
+                continue
             m = re.match(r'^(\S+)\s+(.*)$', stripped)
             if not m:
                 errors.append(f'{ln}: cannot parse: {line[:80]}')

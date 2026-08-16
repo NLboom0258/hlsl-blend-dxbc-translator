@@ -12,26 +12,22 @@
 ## 最新状态
 
 **会话开始时间**:2026-08-16
-**当前阶段**:核心翻译管线已完成,三个真实 shader 零错误翻译 ✅
+**当前阶段**:核心管线完成 + 功能增强中,已验证格式兼容性 ✅
 
 阶段进度:
-- [x] 通读 Python 源码(translator / ast_nodes / symbol_table / rule_loader / rule_engine / function_loader / utils / main)
-- [x] 通读 rules.txt、functions/lib.txt、测试样例
-- [x] 确认构建环境(VS2022 v143 + MSBuild)、DXC 克隆位置
-- [x] 写入 CLAUDE.md(我的工作准则)与本笔记
-- [x] 搭建 C++ 项目骨架(src/ 模块化、vcxproj 通配符、MSBuild 编译通过)
-- [x] 核心模型:types(类型系统)、swizzle(vkd3d 两步 swizzle)、AST
-- [x] 词法+语法解析器(完整表达式优先级、语句、控制流、常量折叠)
-- [x] 符号表+寄存器分配(作用域栈、free list、ever-allocated 跟踪)
-- [x] intrinsic 表 + codegen(DXC 风格集中式表,~45 个内置函数)
-- [x] translator 主循环(全部 8 种标记、if/else/while/for、注释剥离、HLSLInit)
-- [x] 函数库解析与展开(HLSLFunctionImport、in/out/inout、作用域)
-- [x] 纹理采样(Texture2D/Cube/Array、HLSLTexture/HLSLSampler 绑定)
-- [x] 三个真实 shader 零错误翻译(M2全局光照/星见雅modpbr/星见雅mod身体)
-- [ ] 类型/intrinsic 增强(int/uint/bool 位运算等)、循环已在基础层面支持
-- [ ] 汇编器验证输出正确性
-- [ ] 对比 Python 输出、检查翻译质量
-- [ ] 用 DMC5 ShaderFixes/ShaderCache 真实样例扩展测试
+- [x] 通读 Python 源码、规则、测试样例;确认构建环境与 DXC 位置
+- [x] 搭建 C++ 项目骨架(src/ 模块化、vcxproj、MSBuild)
+- [x] 核心模型(types/swizzle/AST)、词法+语法解析器、符号表+寄存器分配
+- [x] intrinsic 表(~50 内置函数)+ codegen、translator 主循环(全部 8 标记)
+- [x] 函数库展开、纹理采样、if/else/while/for 控制流
+- [x] 三个真实 shader(M2全局光照/星见雅modx2)零错误翻译
+- [x] **格式验证**:49 个生成助记符全部在真实 3Dmigoto 反汇编集合内;操作数结构验证器全通过
+- [x] **健壮性**:56 个 ShaderFixes + 604 个 ShaderCache 文件零崩溃;纯 DXBC 透传逐字节一致
+- [x] **功能增强**:int/uint 位运算(& | ^ << >> + 整数立即数位模式)、int 比较指令(ilt/ige/ieq)、
+      uint→float 用 utof、any()/all()、discard、i++/i--、SampleLevel(sample_l)、常量折叠
+- [ ] 待做:switch 语句、sample_c(深度比较采样)、更多 intrinsic、向量动态索引
+- [ ] **最终验证(需用户)**:在 DMC5 游戏中实际加载测试(3Dmigoto 汇编器没有独立 CLI,
+      我已通过格式对比+结构验证确认兼容性,但游戏内加载是最权威验证)
 
 ## 关键决定(用户已知晓/授权)
 
@@ -50,10 +46,11 @@
   ```
 - **运行**:
   ```
-  hlsl_blend_dxbc_translator.exe -input <HLSLBlend文件> -output <输出文件>
+  x64\Release\hlsl_blend_dxbc_translator.exe -input <HLSLBlend文件> [-output <输出文件>] [-data <函数库目录>]
   ```
-- **测试**:测试样例从 Python 项目 Test 目录复制到本项目 tests/。
-- **对比 Python 输出**:Python 版跑法:`cd E:\Project\Python\hlsl_blend_dxbc_translator && python PythonMain/main.py -input <文件> -output <输出>`
+  `-data` 缺省时依次查找:data 目录 → 输入文件目录 → 当前目录。函数库默认 `functions/lib.txt`。
+- **回归测试**:`bash tests/run_tests.sh`(6 个真实 shader + 特性测试 + 结构验证)。
+- **对比 Python 输出**:`cd E:\Project\Python\hlsl_blend_dxbc_translator && python PythonMain/main.py -input <文件> -output <输出>`
 
 ## 遇到的问题 / 待用户决定
 

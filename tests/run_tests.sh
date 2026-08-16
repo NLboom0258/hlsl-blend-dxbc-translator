@@ -98,6 +98,44 @@ HLSLSnippet {
 EOF
 check "函数库+any/all+discard" "$TMP/t_func.txt"
 
+# switch
+cat > "$TMP/t_switch.txt" << 'EOF'
+HLSL int MaterialID = 1;
+HLSL float3 Color = float3(0, 0, 0);
+HLSLSnippet {
+    switch (MaterialID) {
+        case 0:
+            Color = float3(1, 0, 0);
+            break;
+        case 1:
+            Color = float3(0, 1, 0);
+            break;
+        default:
+            Color = float3(1, 1, 1);
+            break;
+    }
+}
+EOF
+check "switch 语句" "$TMP/t_switch.txt"
+
+# edge cases: swizzle compound, chained swizzle, nested ternary, saturate
+cat > "$TMP/t_edge.txt" << 'EOF'
+HLSL float2 UV = float2(0.5, 0.5);
+HLSL float2 Offset = float2(0.1, 0.2);
+HLSL float3 N = float3(0.1, 0.2, 0.3);
+HLSL float S = 0.0;
+HLSLSnippet {
+    UV.xy += Offset.xy;
+    float T = N.xyz.x;
+    S = saturate(N.x) * 2.0 + 1.0;
+    float R = N.z > 0.5 ? (N.y > 0.25 ? 1.0 : 0.5) : 0.0;
+    UV = saturate(UV);
+    float M = fmod(7.5, 2.0);
+    float D = radians(90.0);
+}
+EOF
+check "边界情况+新intrinsic" "$TMP/t_edge.txt"
+
 echo
 echo "===== 结果: $pass 通过, $fail 失败 ====="
 [ "$fail" = "0" ]
