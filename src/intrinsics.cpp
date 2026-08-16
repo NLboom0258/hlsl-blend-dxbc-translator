@@ -504,6 +504,66 @@ static bool iall(CodeGen& cg, Expr* call, const std::string& target) {
     return reduce_bool(cg, call, target, "and");
 }
 
+// radians(x) = x * pi/180; degrees(x) = x * 180/pi
+static bool iscale(CodeGen& cg, Expr* call, const std::string& target, double factor) {
+    if (!check_args(call, 1)) return false;
+    std::vector<std::string> temps;
+    Operand a;
+    if (!cg.eval(call->args[0], a, temps)) return false;
+    std::string dm = dst_mask(target);
+    cg.emit("mul " + target + ", " + cg.fmt_operand(a, dm) + ", l(" + format_float(factor) + ")");
+    for (auto& t : temps) cg.sym.free_temp(t);
+    return true;
+}
+static bool iradians(CodeGen& cg, Expr* call, const std::string& t) {
+    return iscale(cg, call, t, 0.017453292519943295);  // pi/180
+}
+static bool idegrees(CodeGen& cg, Expr* call, const std::string& t) {
+    return iscale(cg, call, t, 57.29577951308232);  // 180/pi
+}
+
+// isnan(x): x != x  ;  isfinite(x): abs(x) <= FLT_MAX
+static bool iisnan(CodeGen& cg, Expr* call, const std::string& target) {
+    if (!check_args(call, 1)) return false;
+    std::vector<std::string> temps;
+    Operand a;
+    if (!cg.eval(call->args[0], a, temps)) return false;
+    std::string dm = dst_mask(target);
+    std::string s = cg.fmt_operand(a, dm);
+    cg.emit("ne " + target + ", " + s + ", " + s);
+    for (auto& t : temps) cg.sym.free_temp(t);
+    return true;
+}
+static bool iisfinite(CodeGen& cg, Expr* call, const std::string& target) {
+    if (!check_args(call, 1)) return false;
+    std::vector<std::string> temps;
+    Operand a;
+    if (!cg.eval(call->args[0], a, temps)) return false;
+    std::string dm = dst_mask(target);
+    cg.emit("mov " + target + ", |" + cg.fmt_operand(a, dm) + "|");
+    cg.emit("le " + target + ", " + target + ", l(3.402823e+38)");
+    for (auto& t : temps) cg.sym.free_temp(t);
+    return true;
+}
+
+// fmod(x, y) = x - y * trunc(x / y)
+static bool ifmod(CodeGen& cg, Expr* call, const std::string& target) {
+    if (!check_args(call, 2)) return false;
+    std::vector<std::string> temps;
+    Operand x, y;
+    if (!cg.eval(call->args[0], x, temps)) return false;
+    if (!cg.eval(call->args[1], y, temps)) return false;
+    std::string dm = dst_mask(target);
+    if (dm.empty()) dm = "xyzw";
+    std::string t = cg.alloc_temp(dm, temps);
+    std::string tb = t.substr(0, t.find('.'));
+    cg.emit("div " + t + ", " + cg.fmt_operand(x, dm) + ", " + cg.fmt_operand(y, dm));
+    cg.emit("round_z " + t + ", " + cg.format_src(tb, dm, dm));
+    cg.emit("mad " + target + ", " + cg.format_src(tb, dm, dm) + ", -" + cg.fmt_operand(y, dm) + ", " + cg.fmt_operand(x, dm));
+    for (auto& tt : temps) cg.sym.free_temp(tt);
+    return true;
+}
+
 // ---------------------------------------------------------------------------
 // Table
 // ---------------------------------------------------------------------------
@@ -550,6 +610,11 @@ const std::vector<std::pair<std::string, IntrinsicInfo>>& intrinsic_table() {
         {"select", {iselect, "float", 3}},
         {"any", {iany, "bool", 1}},
         {"all", {iall, "bool", 1}},
+        {"radians", {iradians, "float", 1}},
+        {"degrees", {idegrees, "float", 1}},
+        {"isnan", {iisnan, "bool", 1}},
+        {"isfinite", {iisfinite, "bool", 1}},
+        {"fmod", {ifmod, "float", 2}},
         {"and", {iand, "uint", 2}},
         {"or", {ior, "uint", 2}},
         {"xor", {ixor, "uint", 2}},
