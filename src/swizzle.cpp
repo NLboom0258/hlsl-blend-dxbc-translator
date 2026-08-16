@@ -71,12 +71,20 @@ Swizzle map_swizzle(Swizzle swizzle, uint32_t writemask) {
 
 Swizzle compute_src_swizzle(const std::string& src_mask, const std::string& dst_mask) {
     // Two-step: (1) build the source's compact 4-component swizzle by padding
-    // with the last component (HLSL replicate-last semantics for scalars and
-    // short masks), (2) map it through the destination writemask so components
-    // land on the correct dest positions (handles non-contiguous writemasks
-    // like ".xw").
+    // with the first component (Microsoft compiler convention), (2) map it
+    // through the destination writemask so components land on the correct
+    // dest positions (handles non-contiguous writemasks like ".xw").
     Swizzle compact = swizzle_from_string(src_mask);
-    return map_swizzle(compact, mask_to_bits(dst_mask));
+    uint32_t dm_bits = mask_to_bits(dst_mask);
+    Swizzle mapped = map_swizzle(compact, dm_bits);
+    // Preserve the source's own components in dest positions not covered by
+    // the writemask (instead of zeroing them to x), so explicitly-written
+    // swizzles like ".yzwy" are kept verbatim as a real compiler would.
+    for (int i = 0; i < 4; ++i) {
+        if (!(dm_bits & (1u << i)))
+            swizzle_set_component(mapped, i, swizzle_get_component(compact, i));
+    }
+    return mapped;
 }
 
 bool invert_swizzle(const std::string& swizzle_str, const std::string& declared_mask,
