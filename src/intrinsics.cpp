@@ -311,6 +311,8 @@ static bool istep(CodeGen& cg, Expr* call, const std::string& target) {
     if (!cg.eval(call->args[1], x, temps)) return false;
     std::string dm = dst_mask(target);
     cg.emit("ge " + target + ", " + cg.fmt_operand(x, dm) + ", " + cg.fmt_operand(edge, dm));
+    // Float comparison returns 0 or all-ones (NaN); normalize to 0.0/1.0.
+    cg.emit("and " + target + ", " + target + ", l(0x3f800000)");
     for (auto& t : temps) cg.sym.free_temp(t);
     return true;
 }
@@ -558,6 +560,7 @@ static bool iisnan(CodeGen& cg, Expr* call, const std::string& target) {
     std::string dm = dst_mask(target);
     std::string s = cg.fmt_operand(a, dm);
     cg.emit("ne " + target + ", " + s + ", " + s);
+    cg.emit("and " + target + ", " + target + ", l(0x3f800000)");
     for (auto& t : temps) cg.sym.free_temp(t);
     return true;
 }
@@ -569,6 +572,7 @@ static bool iisfinite(CodeGen& cg, Expr* call, const std::string& target) {
     std::string dm = dst_mask(target);
     cg.emit("mov " + target + ", |" + cg.fmt_operand(a, dm) + "|");
     cg.emit("le " + target + ", " + target + ", l(3.402823e+38)");
+    cg.emit("and " + target + ", " + target + ", l(0x3f800000)");
     for (auto& t : temps) cg.sym.free_temp(t);
     return true;
 }

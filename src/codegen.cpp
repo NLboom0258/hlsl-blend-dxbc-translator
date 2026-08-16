@@ -539,6 +539,14 @@ bool CodeGen::gen_cmp(Expr* e, const std::string& target_str) {
     else if (op == "==") emit(mn + "eq " + target_str + ", " + ls + ", " + rs);
     else if (op == "!=") emit(mn + "ne " + target_str + ", " + ls + ", " + rs);
     else { error_ = "unsupported comparison: " + op; return false; }
+    // Float comparisons (lt/ge/eq/ne) return 0 or an all-ones bit pattern
+    // (0xFFFFFFFF, i.e. NaN when interpreted as float), NOT 0.0/1.0.
+    // Normalize to exact 0.0/1.0 via "and" with the float 1.0 bit pattern
+    // (fxc's standard idiom, e.g. "and r0.x, r0.x, l(0x3f800000)").
+    // Integer comparisons (ilt/ige/ieq/ine/ult/uge) already return true 0/1.
+    if (!is_int) {
+        emit("and " + target_str + ", " + target_str + ", l(0x3f800000)");
+    }
     for (auto& t : temps) sym.free_temp(t);
     return true;
 }
