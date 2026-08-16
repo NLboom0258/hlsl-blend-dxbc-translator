@@ -318,9 +318,15 @@ static bool ismoothstep(CodeGen& cg, Expr* call, const std::string& target) {
     std::string t3b = t3.substr(0, t3.find('.'));
     // t = clamp((x-lo)/(hi-lo), 0, 1); result = t*t*(3-2t)
     cg.emit("add " + t1 + ", " + cg.fmt_operand(x, dm) + ", -" + cg.fmt_operand(lo, dm));
-    cg.emit("add " + t2 + ", " + cg.fmt_operand(hi, dm) + ", -" + cg.fmt_operand(lo, dm));
-    cg.emit("div " + t1 + ", " + cg.format_src(t1b, dm, dm) + ", " + cg.format_src(t2b, dm, dm));
-    cg.emit("mov_sat " + t1 + ", " + cg.format_src(t1b, dm, dm));
+    // Constant edges: fold 1/(hi-lo) into a multiply (matches fxc).
+    if (lo.is_immediate && hi.is_immediate && lo.vals.size() == 1 && hi.vals.size() == 1) {
+        double inv = 1.0 / (hi.vals[0] - lo.vals[0]);
+        cg.emit("mul_sat " + t1 + ", " + cg.format_src(t1b, dm, dm) + ", l(" + format_float(inv) + ")");
+    } else {
+        cg.emit("add " + t2 + ", " + cg.fmt_operand(hi, dm) + ", -" + cg.fmt_operand(lo, dm));
+        cg.emit("div " + t1 + ", " + cg.format_src(t1b, dm, dm) + ", " + cg.format_src(t2b, dm, dm));
+        cg.emit("mov_sat " + t1 + ", " + cg.format_src(t1b, dm, dm));
+    }
     cg.emit("mad " + t2 + ", " + cg.format_src(t1b, dm, dm) + ", l(-2.0), l(3.0)");  // 3-2t
     cg.emit("mul " + t3 + ", " + cg.format_src(t1b, dm, dm) + ", " + cg.format_src(t1b, dm, dm));  // t^2
     cg.emit("mul " + target + ", " + cg.format_src(t3b, dm, dm) + ", " + cg.format_src(t2b, dm, dm));
