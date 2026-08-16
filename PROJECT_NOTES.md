@@ -71,6 +71,15 @@ Python 版只支持 float/float2/3/4 + 基本运算。C++ 版扩展了:
 
 ## 遇到的问题 / 待用户决定
 
+### ✅ 已修复:saturate 折叠 bug(用户游戏内测试发现主光消失)
+- **现象**:游戏内主光不可见,只剩阴影色/局部光叠色/边缘光
+- **根因**(2026-08-17):`saturate(a*b*c)` 被折叠成 `saturate(saturate(a*b)*c)`。
+  `gen_fold_saturate` 设置的 `fold_sat_` 在递归翻译内层子表达式时未关闭,导致内层 `mul` 也加了 `_sat`。
+- **影响**:主光 `Speculer_Color = saturate(LightColor*intensity*ilmMap.x)`,当 FinalLight>1 时被 IlmMap.x 错误截断,主光高光削弱。
+- **修复**:`CodeGen::eval` 计算临时寄存器时临时关闭 `fold_sat_`,只让最外层指令带 `_sat`。
+- **验证**:主光 Speculer_Color 与 mod(没问题版)语义一致;被读分量 1154/1155 一致;回归 14/14。
+- **教训**:saturate 折叠这类"传播状态"的优化,必须确保状态只影响最外层指令。
+
 ### ⚠️ 你的 shader 文件里有潜在 bug(翻译器正确报告,未崩溃)
 - **文件**:`强制开启接触阴影的关卡全局光照shader88d1a2e189df03f6-ps.txt` 第 550 行
 - **问题**:声明的是 `OffsetDirShadowUV1`(第 549 行 `HLSL float2 OffsetDirShadowUV1 = OffsetShadowUV(...)`),
