@@ -568,6 +568,24 @@ Stmt* Parser::parse_decl_or_assign() {
     Expr* lhs = parse_ternary();
     if (!lhs) return nullptr;
 
+    // Post-increment/decrement: i++ / i--  ->  i += 1 / i -= 1
+    if (is_punct("++") || is_punct("--")) {
+        std::string inc = cur().text;
+        ++pos_;
+        expect_punct(";");
+        if (lhs->kind != Expr::Kind::VarRef) { set_error("++/-- requires a variable"); return nullptr; }
+        Stmt* s = stmt_arena_.alloc();
+        s->kind = Stmt::Kind::CompoundAssign;
+        s->op = (inc == "++") ? "+=" : "-=";
+        s->lhs = lhs;
+        Expr* one = arena_.alloc();
+        one->kind = Expr::Kind::ConstVec;
+        one->elems.push_back(1.0);
+        one->int_literal = true;
+        s->value = one;
+        return s;
+    }
+
     if (is_punct("=") || is_punct("+=") || is_punct("-=") || is_punct("*=") || is_punct("/=")) {
         std::string op = cur().text;
         ++pos_;

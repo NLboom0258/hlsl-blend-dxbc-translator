@@ -175,7 +175,8 @@ Type CodeGen::infer_type(Expr* e) {
     }
     case Expr::Kind::ConstVec: {
         int n = (int)e->elems.size();
-        return n > 1 ? make_vector(n, BaseType::Float) : make_scalar(BaseType::Float);
+        BaseType b = e->int_literal ? BaseType::Int : BaseType::Float;
+        return n > 1 ? make_vector(n, b) : make_scalar(b);
     }
     case Expr::Kind::BinOp: {
         Type l = infer_type(e->left), r = infer_type(e->right);
@@ -363,12 +364,14 @@ bool CodeGen::gen_binop(Expr* e, const std::string& target_str) {
         Operand l;
         if (!eval(e->left, l, temps)) return false;
         double c = e->right->elems[0];
+        Type lt = infer_type(e->left);
+        bool int_ctx = bitwise || lt.is_int() || lt.is_uint() || lt.is_bool();
         std::string ls = fmt_operand(l, dm);
-        std::string imm = bitwise ? ("l(" + std::to_string((long long)c) + ")")
+        std::string imm = int_ctx ? ("l(" + std::to_string((long long)c) + ")")
                                   : ("l(" + format_float(c) + ")");
-        if (op == "+") emit("add " + target_str + ", " + ls + ", " + imm);
-        else if (op == "-") emit("add " + target_str + ", " + ls + ", -" + imm);
-        else if (op == "*") emit("mul " + target_str + ", " + ls + ", " + imm);
+        if (op == "+") emit((int_ctx ? "iadd " : "add ") + target_str + ", " + ls + ", " + imm);
+        else if (op == "-") emit((int_ctx ? "iadd " : "add ") + target_str + ", " + ls + ", -" + imm);
+        else if (op == "*") emit((int_ctx ? "imul " : "mul ") + target_str + ", " + ls + ", " + imm);
         else if (op == "&" || op == "&&") emit("and " + target_str + ", " + ls + ", " + imm);
         else if (op == "|" || op == "||") emit("or " + target_str + ", " + ls + ", " + imm);
         else if (op == "^") emit("xor " + target_str + ", " + ls + ", " + imm);
@@ -462,19 +465,31 @@ bool CodeGen::gen_unary(Expr* e, const std::string& target_str) {
 
 bool CodeGen::gen_cmp(Expr* e, const std::string& target_str) {
     std::string dm = target_mask_of(target_str);
+    Type lt = infer_type(e->left), rt = infer_type(e->right);
+    bool is_int = (lt.is_int() || lt.is_uint() || lt.is_bool()) &&
+                  (rt.is_int() || rt.is_uint() || rt.is_bool());
+    bool is_uint = lt.is_uint() || rt.is_uint();
     std::vector<std::string> temps;
     Operand l, r;
     if (!eval(e->left, l, temps)) return false;
     if (!eval(e->right, r, temps)) return false;
-    std::string ls = fmt_operand(l, dm);
-    std::string rs = fmt_operand(r, dm);
+    auto fmt = [&](const Operand& o) -> std::string {
+        if (o.is_immediate)
+            return is_int ? format_imm_int(o.vals, dm) : format_imm(o.vals, dm);
+        return format_src(o.reg, o.mask, dm);
+    };
+    std::string ls = fmt(l);
+    std::string rs = fmt(r);
     const std::string& op = e->op;
-    if (op == ">") emit("lt " + target_str + ", " + rs + ", " + ls);
-    else if (op == "<") emit("lt " + target_str + ", " + ls + ", " + rs);
-    else if (op == ">=") emit("ge " + target_str + ", " + ls + ", " + rs);
-    else if (op == "<=") emit("ge " + target_str + ", " + rs + ", " + ls);
-    else if (op == "==") emit("eq " + target_str + ", " + ls + ", " + rs);
-    else if (op == "!=") emit("ne " + target_str + ", " + ls + ", " + rs);
+    std::string mn = is_int ? "i" : "";
+    if (is_uint && (op == "<" || op == "<=" || op == ">" || op == ">="))
+        mn = "u";
+    if (op == ">") emit(mn + "lt " + target_str + ", " + rs + ", " + ls);
+    else if (op == "<") emit(mn + "lt " + target_str + ", " + ls + ", " + rs);
+    else if (op == ">=") emit(mn + "ge " + target_str + ", " + ls + ", " + rs);
+    else if (op == "<=") emit(mn + "ge " + target_str + ", " + rs + ", " + ls);
+    else if (op == "==") emit(mn + "eq " + target_str + ", " + ls + ", " + rs);
+    else if (op == "!=") emit(mn + "ne " + target_str + ", " + ls + ", " + rs);
     else { error_ = "unsupported comparison: " + op; return false; }
     for (auto& t : temps) sym.free_temp(t);
     return true;
@@ -546,7 +561,15 @@ bool CodeGen::gen_sample(Expr* e, const std::string& target_str) {
     Operand uv;
     if (!eval(e->uv_expr, uv, temps)) return false;
     std::string uv_s = fmt_operand(uv, dm);
-    emit("sample " + target_str + ", " + uv_s + ", " + tex->reg + ".xyzw, " + samp->reg);
+    if (e->false_expr) {
+        // SampleLevel: sample_l dst, uv, tex, sampler, lod
+        Operand lod;
+        if (!eval(e->false_expr, lod, temps)) return false;
+        std::string lod_s = fmt_operand(lod, "x");
+        emit("sample_l " + target_str + ", " + uv_s + ", " + tex->reg + ".xyzw, " + samp->reg + ", " + lod_s);
+    } else {
+        emit("sample " + target_str + ", " + uv_s + ", " + tex->reg + ".xyzw, " + samp->reg);
+    }
     for (auto& t : temps) sym.free_temp(t);
     return true;
 }
