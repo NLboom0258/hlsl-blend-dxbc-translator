@@ -20,6 +20,8 @@ public:
     void set_data_dir(const std::string& dir) { data_dir_ = dir; }
     // Set the input file's directory (additional search path for function libs).
     void set_input_dir(const std::string& dir) { input_dir_ = dir; }
+    // When true, saturate() lowers to min/max instead of _sat modifiers.
+    void set_use_minmax_sat(bool b) { use_minmax_sat_ = b; }
 
     // Translate input lines (DXBC + HLSL blend markers) to pure DXBC asm lines.
     // Output lines have no trailing newline. Returns false on fatal error.
@@ -30,6 +32,7 @@ public:
 private:
     std::string data_dir_;
     std::string input_dir_;
+    bool use_minmax_sat_ = false;
     std::map<std::string, FunctionDef> functions_;
 
     // Per-run state
@@ -79,6 +82,7 @@ bool translate_lines(const std::vector<std::string>& input,
                      std::vector<std::string>& out,
                      const std::string& data_dir,
                      const std::string& input_dir,
-                     std::string& error);
+                     std::string& error,
+                     bool use_minmax_sat = false);
 
 } // namespace hb

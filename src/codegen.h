@@ -95,6 +95,9 @@ public:
 
     // Current instruction saturate fold state (set while lowering saturate(expr)).
     bool fold_sat_ = false;
+    // When true, saturate() is lowered as min/max instead of _sat modifiers
+    // (mirrors the Python reference output; useful for A/B testing).
+    bool use_minmax_sat = false;
     std::string sat_suffix() const { return fold_sat_ ? "_sat" : ""; }
 
     // Custom function expansion hook (set by the Translator for

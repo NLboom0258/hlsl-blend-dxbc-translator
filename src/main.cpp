@@ -50,10 +50,17 @@ static const char* arg_value(int argc, char* argv[], const char* short_flag, con
     return nullptr;
 }
 
+static bool has_flag(int argc, char* argv[], const char* flag) {
+    for (int i = 1; i < argc; ++i)
+        if (!strcmp(argv[i], flag)) return true;
+    return false;
+}
+
 int main(int argc, char* argv[]) {
     const char* input_path = arg_value(argc, argv, "-i", "-input");
     const char* output_path = arg_value(argc, argv, "-o", "-output");
     const char* data_dir = arg_value(argc, argv, "-d", "-data");
+    bool use_minmax_sat = has_flag(argc, argv, "-no-sat-fold") || has_flag(argc, argv, "-n");
 
     if (!input_path) {
         fprintf(stderr, "HLSL Blend DXBC Translator (C++)\n"
@@ -84,7 +91,7 @@ int main(int argc, char* argv[]) {
 
     if (!output_path) {
         // Print to stdout
-        if (!hb::translate_lines(lines, out, data, in_dir, error)) {
+        if (!hb::translate_lines(lines, out, data, in_dir, error, use_minmax_sat)) {
             fprintf(stderr, "Error: %s\n", error.c_str());
             return 1;
         }
@@ -92,7 +99,7 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
-    if (!hb::translate_lines(lines, out, data, in_dir, error)) {
+    if (!hb::translate_lines(lines, out, data, in_dir, error, use_minmax_sat)) {
         fprintf(stderr, "Error: %s\n", error.c_str());
         return 1;
     }

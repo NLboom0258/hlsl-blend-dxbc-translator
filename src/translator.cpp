@@ -146,6 +146,7 @@ bool Translator::run(const std::vector<std::string>& input_lines,
     symtab_ = &symtab;
 
     CodeGen cg(symtab, arena_, out_lines);
+    cg.use_minmax_sat = use_minmax_sat_;
     cg_ = &cg;
     cg.set_custom_expander([this](CodeGen&, Expr* call, const std::string& target) -> bool {
         std::string err;
@@ -873,10 +874,12 @@ bool translate_lines(const std::vector<std::string>& input,
                      std::vector<std::string>& out,
                      const std::string& data_dir,
                      const std::string& input_dir,
-                     std::string& error) {
+                     std::string& error,
+                     bool use_minmax_sat) {
     Translator t;
     t.set_data_dir(data_dir);
     if (!input_dir.empty()) t.set_input_dir(input_dir);
+    t.set_use_minmax_sat(use_minmax_sat);
     return t.run(input, out, error);
 }
 
