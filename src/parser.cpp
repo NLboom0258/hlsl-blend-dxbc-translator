@@ -209,6 +209,29 @@ Expr* Parser::parse_postfix() {
                 s->sampler_expr = sampler;
                 s->uv_expr = uv;
                 s->false_expr = lod; // stash lod (SampleLevel)
+                s->sample_kind = 1;
+                e = s;
+                continue;
+            }
+            if (ident == "SampleCmp" && is_punct("(")) {
+                // tex.SampleCmp(sampler, uv, ref) -> sample_c
+                ++pos_;
+                Expr* sampler = parse_ternary();
+                if (!sampler) return nullptr;
+                if (!expect_punct(",")) return nullptr;
+                Expr* uv = parse_ternary();
+                if (!uv) return nullptr;
+                if (!expect_punct(",")) return nullptr;
+                Expr* ref = parse_ternary();
+                if (!ref) return nullptr;
+                if (!expect_punct(")")) return nullptr;
+                Expr* s = arena_.alloc();
+                s->kind = Expr::Kind::Sample;
+                s->name = e->name;
+                s->sampler_expr = sampler;
+                s->uv_expr = uv;
+                s->false_expr = ref; // stash compare-ref
+                s->sample_kind = 2;
                 e = s;
                 continue;
             }

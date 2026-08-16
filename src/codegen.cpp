@@ -561,12 +561,18 @@ bool CodeGen::gen_sample(Expr* e, const std::string& target_str) {
     Operand uv;
     if (!eval(e->uv_expr, uv, temps)) return false;
     std::string uv_s = fmt_operand(uv, dm);
-    if (e->false_expr) {
+    if (e->sample_kind == 1) {
         // SampleLevel: sample_l dst, uv, tex, sampler, lod
         Operand lod;
         if (!eval(e->false_expr, lod, temps)) return false;
         std::string lod_s = fmt_operand(lod, "x");
         emit("sample_l " + target_str + ", " + uv_s + ", " + tex->reg + ".xyzw, " + samp->reg + ", " + lod_s);
+    } else if (e->sample_kind == 2) {
+        // SampleCmp: sample_c dst, uv, tex, sampler, ref
+        Operand ref;
+        if (!eval(e->false_expr, ref, temps)) return false;
+        std::string ref_s = fmt_operand(ref, "x");
+        emit("sample_c " + target_str + ", " + uv_s + ", " + tex->reg + ".xyzw, " + samp->reg + ", " + ref_s);
     } else {
         emit("sample " + target_str + ", " + uv_s + ", " + tex->reg + ".xyzw, " + samp->reg);
     }

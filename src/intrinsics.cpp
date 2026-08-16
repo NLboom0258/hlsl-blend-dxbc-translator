@@ -84,6 +84,9 @@ static bool inot(CodeGen& cg, Expr* call, const std::string& target) {
 
 static bool isqrt(CodeGen& cg, Expr* c, const std::string& t) { return unary_intrinsic(cg, c, t, "sqrt"); }
 static bool irsqrt(CodeGen& cg, Expr* c, const std::string& t) { return unary_intrinsic(cg, c, t, "rsq"); }
+static bool iddx(CodeGen& cg, Expr* c, const std::string& t) { return unary_intrinsic(cg, c, t, "ddx"); }
+static bool iddy(CodeGen& cg, Expr* c, const std::string& t) { return unary_intrinsic(cg, c, t, "ddy"); }
+static bool ircp(CodeGen& cg, Expr* c, const std::string& t) { return unary_intrinsic(cg, c, t, "rcp"); }
 static bool ifloor(CodeGen& cg, Expr* c, const std::string& t) { return unary_intrinsic(cg, c, t, "round_ni"); }
 static bool iceil(CodeGen& cg, Expr* c, const std::string& t) { return unary_intrinsic(cg, c, t, "round_pi"); }
 static bool itrunc(CodeGen& cg, Expr* c, const std::string& t) { return unary_intrinsic(cg, c, t, "round_z"); }
@@ -484,6 +487,9 @@ const std::vector<std::pair<std::string, IntrinsicInfo>>& intrinsic_table() {
         {"abs", {iabs, "float", 1}},
         {"sqrt", {isqrt, "float", 1}},
         {"rsqrt", {irsqrt, "float", 1}},
+        {"ddx", {iddx, "float", 1}},
+        {"ddy", {iddy, "float", 1}},
+        {"rcp", {ircp, "float", 1}},
         {"dot", {idot, "float", 2}},
         {"length", {ilength, "float", 1}},
         {"distance", {idistance, "float", 2}},

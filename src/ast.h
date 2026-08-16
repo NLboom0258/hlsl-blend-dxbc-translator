@@ -51,6 +51,7 @@ struct Expr {
     Expr* false_expr = nullptr;
     Expr* sampler_expr = nullptr;  // Sample
     Expr* uv_expr = nullptr;       // Sample
+    int sample_kind = 0;           // Sample: 0=Sample, 1=SampleLevel, 2=SampleCmp
 
     // Cast target / Construct dimension
     Type cast_type;

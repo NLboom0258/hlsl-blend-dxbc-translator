@@ -61,7 +61,7 @@ def main():
                 continue
             if stripped == 'ps_5_0' or stripped.startswith('dcl_'):
                 continue
-            if stripped in ('else', 'endif', 'loop', 'endloop', 'ret', 'break', 'continue'):
+            if stripped in ('else', 'endif', 'loop', 'endloop', 'ret', 'break', 'continue', 'discard'):
                 continue
             m = re.match(r'^(\S+)\s+(.*)$', stripped)
             if not m:

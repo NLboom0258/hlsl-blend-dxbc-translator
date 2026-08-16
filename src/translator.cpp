@@ -783,11 +783,14 @@ bool Translator::expand_function_call(Expr* call, const std::string& target, std
         Operand op;
         if (!cg_->eval(arg, op, arg_temps)) { error = cg_->error(); goto done; }
         if (op.is_immediate) {
-            std::string t = symtab_->alloc_temp("xyzw");
+            std::string pm = type_mask_for(p.type);
+            std::string t = symtab_->alloc_temp(pm);
             std::string dm = CodeGen::target_mask_of(t);
-            cg_->emit("mov " + t + ", " + cg_->format_imm(op.vals, dm));
+            bool pint = p.type.is_int() || p.type.is_uint();
+            cg_->emit("mov " + t + ", " +
+                      (pint ? cg_->format_imm_int(op.vals, dm) : cg_->format_imm(op.vals, dm)));
             std::string tb = t.substr(0, t.find('.'));
-            symtab_->declare(p.name, tb, "xyzw", p.type, false);
+            symtab_->declare(p.name, tb, pm, p.type, false);
         } else {
             symtab_->declare(p.name, op.reg, op.mask, p.type, false);
         }
