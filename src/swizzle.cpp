@@ -19,8 +19,11 @@ Swizzle swizzle_from_string(const std::string& s) {
     int n = (int)s.size();
     if (n <= 0)
         return SWIZZLE_XYZW;
+    // Pad unused components by replicating the FIRST valid component, matching
+    // the convention used by Microsoft's compiler (fxc/D3DCompile) and seen in
+    // 3Dmigoto disassembly: .xy -> .xyxx, .xyz -> .xyzx, .zw -> .zwzz.
     for (int i = 0; i < 4; ++i) {
-        int idx = (i < n) ? mask_index_of(s[i]) : mask_index_of(s[n - 1]);
+        int idx = (i < n) ? mask_index_of(s[i]) : mask_index_of(s[0]);
         if (idx < 0) idx = 0;
         swizzle_set_component(sw, i, (uint8_t)idx);
     }
