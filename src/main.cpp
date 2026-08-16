@@ -74,11 +74,17 @@ int main(int argc, char* argv[]) {
     std::string error;
     std::string data = data_dir ? data_dir : ".";
 
-    // Resolve data dir relative to the input file's directory so
-    // HLSLFunctionImport "functions/lib.txt" works from anywhere.
+    // Input file directory (for resolving HLSLFunctionImport relative paths).
+    std::string in_dir;
+    {
+        std::string p = input_path;
+        size_t pos = p.find_last_of("\\/");
+        if (pos != std::string::npos) in_dir = p.substr(0, pos);
+    }
+
     if (!output_path) {
         // Print to stdout
-        if (!hb::translate_lines(lines, out, data, error)) {
+        if (!hb::translate_lines(lines, out, data, in_dir, error)) {
             fprintf(stderr, "Error: %s\n", error.c_str());
             return 1;
         }
@@ -86,7 +92,7 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
-    if (!hb::translate_lines(lines, out, data, error)) {
+    if (!hb::translate_lines(lines, out, data, in_dir, error)) {
         fprintf(stderr, "Error: %s\n", error.c_str());
         return 1;
     }

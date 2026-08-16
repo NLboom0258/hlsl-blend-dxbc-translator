@@ -18,6 +18,8 @@ public:
 
     // Set base directory for resolving HLSLFunctionImport relative paths.
     void set_data_dir(const std::string& dir) { data_dir_ = dir; }
+    // Set the input file's directory (additional search path for function libs).
+    void set_input_dir(const std::string& dir) { input_dir_ = dir; }
 
     // Translate input lines (DXBC + HLSL blend markers) to pure DXBC asm lines.
     // Output lines have no trailing newline. Returns false on fatal error.
@@ -27,6 +29,7 @@ public:
 
 private:
     std::string data_dir_;
+    std::string input_dir_;
     std::map<std::string, FunctionDef> functions_;
 
     // Per-run state
@@ -75,6 +78,7 @@ private:
 bool translate_lines(const std::vector<std::string>& input,
                      std::vector<std::string>& out,
                      const std::string& data_dir,
+                     const std::string& input_dir,
                      std::string& error);
 
 } // namespace hb

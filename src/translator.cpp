@@ -57,13 +57,17 @@ bool Translator::load_function_libraries(const std::vector<std::string>& lines, 
         std::smatch m;
         if (std::regex_match(stripped, m, import_re)) {
             std::string rel = m[1].str();
-            // Normalize path separators for Windows.
-            std::string path = data_dir_.empty() ? rel : data_dir_ + "\\" + rel;
-            for (auto& c : path) if (c == '/') c = '\\';
-            FILE* f = fopen(path.c_str(), "rb");
-            if (!f) {
-                // try relative to cwd too
-                f = fopen(rel.c_str(), "rb");
+            // Try, in order: data_dir, input dir (if set), cwd.
+            std::vector<std::string> candidates;
+            if (!data_dir_.empty()) candidates.push_back(data_dir_);
+            if (!input_dir_.empty()) candidates.push_back(input_dir_);
+            candidates.push_back(".");
+            FILE* f = nullptr;
+            for (std::string base : candidates) {
+                std::string path = base + "\\" + rel;
+                for (auto& c : path) if (c == '/') c = '\\';
+                f = fopen(path.c_str(), "rb");
+                if (f) break;
             }
             if (!f) {
                 error = "function library not found: " + rel;
@@ -865,9 +869,11 @@ done:
 bool translate_lines(const std::vector<std::string>& input,
                      std::vector<std::string>& out,
                      const std::string& data_dir,
+                     const std::string& input_dir,
                      std::string& error) {
     Translator t;
     t.set_data_dir(data_dir);
+    if (!input_dir.empty()) t.set_input_dir(input_dir);
     return t.run(input, out, error);
 }
 
