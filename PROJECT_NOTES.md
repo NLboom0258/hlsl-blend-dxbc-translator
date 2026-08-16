@@ -21,9 +21,12 @@
 - [x] intrinsic 表(~60 内置函数)+ codegen、translator 主循环(全部 8 标记)
 - [x] 函数库展开、纹理采样、if/else/while/for/switch 控制流
 - [x] 三个真实 shader 零错误翻译;56 ShaderFixes + 604 ShaderCache 零崩溃
+- [x] **生产验证**:用户实际部署的 mod shader(二次元卡通渲染风格shader替换Mod/ShaderFixes/695c8c0feada9292-ps.txt,
+      1839 行/12 snippets)零错误翻译 + 结构验证通过
 - [x] 格式验证:助记符全在 3Dmigoto 集合内 + 结构验证 + **fxc 交叉验证**(normalize/dot/saturate/ternary/clamp/exp/log/sincos/cross 与微软编译器一致)
 - [x] 功能增强(详见下方「扩展语法」)
 - [x] 可移植性:MSVC + MinGW/g++ 双编译器构建通过
+- [x] 健壮性:500 次随机模糊测试 0 崩溃
 - [ ] **最终验证(需用户)**:在 DMC5 游戏中实际加载(3Dmigoto 汇编器无独立 CLI,已用格式对比+fxc 交叉验证确认兼容性,但游戏内加载是最权威测试)
 
 ## 扩展语法(相比 Python 版新增,用户可放心使用)
