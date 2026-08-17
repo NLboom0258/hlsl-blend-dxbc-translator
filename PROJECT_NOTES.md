@@ -154,6 +154,17 @@ Python 有而 C++ 缺的项:
    reversebits/countbits/firstbithigh/firstbitlow、fwidth/ddx_coarse/fine/ddy_coarse/fine、clip、transpose/determinant。
 6. **struct 完全不支持**;预处理器/cbuffer/属性在 3Dmigoto 标记格式中一般不出现,影响小。
 
+### 第三轮补齐(2026-08-17):矩阵报错 + 前置++ + 位复合赋值 + mad/reflect
+
+按用户授权(改动小/风险低/价值高),从差距清单中挑的这批:
+- **矩阵改为报错**(防静默错误,最高优先):`float4x4(...)` 构造、`(float4x4)x` cast、`float4x4 M` 声明、HLSLMov 矩阵声明
+  全部输出 `matrix types not supported`,不再静默输出错值。
+- **前置 ++i/--i**:降级为 `i+=1`/`i-=1`(与后置一致)。
+- **位复合赋值** `&= |= ^= <<= >>=`:lexer 补 `&= |= ^=` 三个 token,parser 识别后走 CompoundAssign。
+- **内置函数 mad/reflect**:`mad(a,b,c)`→mad 指令;`reflect(I,N)=I-2·dot(N,I)·N`→dp3+add+mul+add。
+  fxc 交叉验证:mad 完全一致,reflect 语义一致(fxc 用 dot(V,N),点积可交换)。
+- 回归 17/17(新增前置++/位复合/mad/reflect、矩阵报错测试)。
+
 ### C++ 超出 Python 的能力(用户问,2026-08-17)
 
 - 类型:int/uint/bool + 位运算(& | ^ << >> ~)、整数比较、utof、asfloat/asint/asuint

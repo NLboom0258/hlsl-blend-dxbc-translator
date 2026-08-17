@@ -86,7 +86,8 @@ std::vector<Token> tokenize(const std::string& text) {
 
         // Punctuation / operators (longest match)
         static const char* multi[] = {"<<=", ">>=", "&&=", "||=", "==", "!=", "<=", ">=",
-                                       "+=", "-=", "*=", "/=", "&&", "||", "<<", ">>", "++", "--"};
+                                       "+=", "-=", "*=", "/=", "&=", "|=", "^=", "&&", "||",
+                                       "<<", ">>", "++", "--"};
         bool matched = false;
         for (const char* op : multi) {
             size_t len = strlen(op);

@@ -375,6 +375,42 @@ static bool ilerp(CodeGen& cg, Expr* call, const std::string& target) {
     return true;
 }
 
+static bool imad(CodeGen& cg, Expr* call, const std::string& target) {
+    if (!check_args(call, 3)) return false;
+    std::vector<std::string> temps;
+    Operand a, b, c;
+    if (!cg.eval(call->args[0], a, temps)) return false;
+    if (!cg.eval(call->args[1], b, temps)) return false;
+    if (!cg.eval(call->args[2], c, temps)) return false;
+    std::string dm = dst_mask(target);
+    cg.emit("mad " + target + ", " + cg.fmt_operand(a, dm) + ", " + cg.fmt_operand(b, dm) + ", " + cg.fmt_operand(c, dm));
+    for (auto& tt : temps) cg.sym.free_temp(tt);
+    return true;
+}
+
+static bool ireflect(CodeGen& cg, Expr* call, const std::string& target) {
+    // reflect(I, N) = I - 2 * dot(N, I) * N
+    if (!check_args(call, 2)) return false;
+    std::vector<std::string> temps;
+    Operand I, N;
+    if (!cg.eval(call->args[0], I, temps)) return false;
+    if (!cg.eval(call->args[1], N, temps)) return false;
+    std::string dm = dst_mask(target);
+    int dim = cg.infer_dim(call->args[1]);
+    if (dim < 2 || dim > 4) dim = 3;
+    const char* dpm = dim == 2 ? "dp2" : (dim == 4 ? "dp4" : "dp3");
+    std::string t = cg.alloc_temp("x", temps);
+    std::string tb = t.substr(0, t.find('.'));
+    cg.emit(std::string(dpm) + " " + t + ", " + cg.fmt_operand(N, dm) + ", " + cg.fmt_operand(I, dm));
+    cg.emit("add " + t + ", " + t + ", " + t);  // 2*dot
+    std::string t2 = cg.alloc_temp(dm, temps);
+    std::string t2b = t2.substr(0, t2.find('.'));
+    cg.emit("mul " + t2 + ", " + cg.fmt_operand(N, dm) + ", " + cg.format_src(tb, "x", dm));
+    cg.emit("add " + target + ", " + cg.fmt_operand(I, dm) + ", -" + cg.format_src(t2b, dm, dm));
+    for (auto& tt : temps) cg.sym.free_temp(tt);
+    return true;
+}
+
 static bool ipow(CodeGen& cg, Expr* call, const std::string& target) {
     if (!check_args(call, 2)) return false;
     // Constant small integer exponent: expand to repeated multiplication
@@ -618,9 +654,11 @@ const std::vector<std::pair<std::string, IntrinsicInfo>>& intrinsic_table() {
         {"distance", {idistance, "float", 2}},
         {"normalize", {inormalize, "float3", 1}},
         {"cross", {icross, "float3", 2}},
+        {"reflect", {ireflect, "float3", 2}},
         {"step", {istep, "float", 2}},
         {"smoothstep", {ismoothstep, "float", 3}},
         {"lerp", {ilerp, "float", 3}},
+        {"mad", {imad, "float", 3}},
         {"pow", {ipow, "float", 2}},
         {"exp", {iexp, "float", 1}},
         {"exp2", {iexp2, "float", 1}},

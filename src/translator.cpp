@@ -349,6 +349,10 @@ bool Translator::handle_hlsl_mov(const std::string& line, const std::string& ind
         error = "HLSLMov: unknown type " + type_name;
         return false;
     }
+    if (has_type && type.is_matrix()) {
+        error = "HLSLMov: matrix types not supported";
+        return false;
+    }
 
     Symbol* existing = symtab_->lookup(var_name);
     if (has_type) {
@@ -658,6 +662,7 @@ bool Translator::translate_stmt(Stmt* s, const std::string& indent, std::string&
 }
 
 bool Translator::translate_decl(Stmt* s, const std::string& indent, std::string& error) {
+    if (s->type.is_matrix()) { error = "matrix types not supported"; return false; }
     std::string name = s->name;
     // Only a declaration in the *current* scope is a redeclare; a name that
     // exists only in an outer scope (e.g. a function-local shadowing a caller

@@ -164,6 +164,42 @@ HLSL float S = (C + Swz).x;
 EOF
 check "member访问+rgba+绑定注释" "$TMP/t_member.txt"
 
+# prefix ++/--, bitwise compound assign, mad/reflect
+cat > "$TMP/t_ops.txt" << 'EOF'
+HLSL int i = 0;
+HLSL int j = 5;
+HLSL uint M = 0xFF;
+HLSL uint S = 3;
+HLSL float3 N = float3(0, 0, 1);
+HLSL float3 V = float3(1, 2, 3);
+HLSL float R = mad(0.5, 0.5, 0.25);
+HLSL float3 Refl = reflect(V, N);
+HLSLSnippet {
+    ++i;
+    --j;
+    M &= 0x0F;
+    M |= 0x80;
+    M ^= 0x03;
+    S <<= 2;
+    S >>= 1;
+}
+EOF
+check "前置++/--+位复合赋值+mad/reflect" "$TMP/t_ops.txt"
+
+# matrix must report an error, not silently produce wrong code
+cat > "$TMP/t_mat.txt" << 'EOF'
+HLSL float4x4 M = float4x4(1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1);
+EOF
+if "$EXE" -input "$TMP/t_mat.txt" -output "$TMP/out.txt" -data "$DATA" >/dev/null 2>&1; then
+    if grep -q "matrix types not supported" "$TMP/out.txt"; then
+        echo "PASS: 矩阵报错(非静默)"; pass=$((pass+1))
+    else
+        echo "FAIL(矩阵无报错): 矩阵"; fail=$((fail+1))
+    fi
+else
+    echo "FAIL(矩阵崩溃): 矩阵"; fail=$((fail+1))
+fi
+
 echo
 echo "===== 结果: $pass 通过, $fail 失败 ====="
 [ "$fail" = "0" ]

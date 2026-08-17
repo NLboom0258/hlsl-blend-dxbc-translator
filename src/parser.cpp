@@ -355,6 +355,7 @@ Expr* Parser::parse_primary() {
         if (peek().kind == TokKind::Ident) {
             Type t;
             if (parse_type_name(peek().text, t) && peek(2).text == ")") {
+                if (t.is_matrix()) { set_error("matrix types not supported"); return nullptr; }
                 ++pos_; ++pos_; ++pos_; // consume ( type )
                 Expr* operand = parse_unary();
                 if (!operand) return nullptr;
@@ -389,6 +390,7 @@ Expr* Parser::parse_primary() {
         // floatN(...) constructor
         if (is_type && peek().kind == TokKind::Punct && peek().text == "(") {
             ++pos_; ++pos_;
+            if (t.is_matrix()) { set_error("matrix types not supported"); return nullptr; }
             std::vector<Expr*> args;
             if (!is_punct(")")) {
                 while (true) {
@@ -657,6 +659,25 @@ Stmt* Parser::parse_decl_or_assign() {
         if (is_ident("const")) {} // ignore
     }
 
+    // Prefix ++i / --i  ->  i += 1 / i -= 1
+    if (is_punct("++") || is_punct("--")) {
+        std::string inc = cur().text;
+        ++pos_;
+        Expr* lhs = parse_ternary();
+        if (!lhs || lhs->kind != Expr::Kind::VarRef) { set_error("++/-- requires a variable"); return nullptr; }
+        expect_punct(";");
+        Stmt* s = stmt_arena_.alloc();
+        s->kind = Stmt::Kind::CompoundAssign;
+        s->op = (inc == "++") ? "+=" : "-=";
+        s->lhs = lhs;
+        Expr* one = arena_.alloc();
+        one->kind = Expr::Kind::ConstVec;
+        one->elems.push_back(1.0);
+        one->int_literal = true;
+        s->value = one;
+        return s;
+    }
+
     // Declaration: type name [.mask] [= expr] ;
     if (cur().kind == TokKind::Ident) {
         Type t;
@@ -711,7 +732,8 @@ Stmt* Parser::parse_decl_or_assign() {
         return s;
     }
 
-    if (is_punct("=") || is_punct("+=") || is_punct("-=") || is_punct("*=") || is_punct("/=")) {
+    if (is_punct("=") || is_punct("+=") || is_punct("-=") || is_punct("*=") || is_punct("/=") ||
+        is_punct("&=") || is_punct("|=") || is_punct("^=") || is_punct("<<=") || is_punct(">>=")) {
         std::string op = cur().text;
         ++pos_;
         Expr* rhs = parse_ternary();
