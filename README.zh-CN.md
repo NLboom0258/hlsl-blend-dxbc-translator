@@ -64,9 +64,7 @@ hlsl_blend_dxbc_translator.exe -input <文件> [-output <输出.asm>] [-data <�
   默认函数库是 `functions/lib.txt`。
 - `-no-sat-fold` 禁用 saturate 折叠(改用 min/max)——排查用调试参数。
 
-## 超出 Python 原版的 HLSL 支持
-
-C++ 版刻意超越旧的 Python 实现:
+## 支持的 HLSL
 
 - **类型**:`float`/`int`/`uint`/`bool`/`double`/`half`/`min16*`、向量和 4x4 以内矩阵
   (矩阵*运算*暂未实现,会报错而不是输出错误代码)

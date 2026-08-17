@@ -71,9 +71,7 @@ hlsl_blend_dxbc_translator.exe -input <file> [-output <out.asm>] [-data <lib dir
 - `-no-sat-fold` disables `saturate` folding (uses min/max instead) — a debug
   flag for comparing against the reference output.
 
-## Supported HLSL (beyond the Python original)
-
-The C++ version deliberately exceeds the old Python implementation:
+## Supported HLSL
 
 - **Types**: `float`/`int`/`uint`/`bool`/`double`/`half`/`min16*`, vectors and
   matrices up to 4x4 (matrix *operations* are not yet supported and report an
