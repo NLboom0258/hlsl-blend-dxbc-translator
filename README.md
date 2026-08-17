@@ -1,0 +1,111 @@
+# HLSL Blend DXBC Translator
+
+A C++17 translator for **3Dmigoto ShaderFixes** that converts files mixing DXBC
+shader assembly with embedded HLSL snippets back into pure DXBC SM5 assembly.
+
+Input files for 3Dmigoto shader modding are usually disassembled DXBC assembly
+with a few hand-written HLSL fragments (for math that is painful to write in raw
+assembly). This tool parses those mixed files, translates every HLSL fragment to
+correct DXBC SM5 instructions, and emits a ready-to-deploy pure-assembly shader.
+
+This is a from-scratch C++ rewrite of an earlier Python prototype. The
+translation logic follows the official compilers — DXC (`DirectXShaderCompiler`)
+as the primary reference, vkd3d as a secondary one — rather than the ad-hoc
+logic of the old Python version.
+
+## The 8 marker syntax
+
+Non-marker lines are passed through verbatim. Markers are translated:
+
+| Marker | Purpose |
+|---|---|
+| `HLSLMov <type> <var>[.swizzle] = <reg>;` | Bind an HLSL variable to a DXBC register |
+| `DXBCMov <dest reg>, <var>[.swizzle]` | Write an HLSL variable back to a DXBC register |
+| `HLSL <single-line HLSL statement>` | Translate one HLSL statement |
+| `HLSLSnippet { ... }` | Translate a block of HLSL (if/else/for/while/switch supported) |
+| `HLSLInit` | Zero every allocated temp register at this point |
+| `HLSLTexture Texture2D X = tN;` | Bind a texture alias |
+| `HLSLSampler SamplerState X = sN;` | Bind a sampler alias |
+| `HLSLFunctionImport "functions/lib.txt";` | Import a custom function library |
+
+Example:
+
+```
+Texture2D IlmMapTex0 = t50;
+SamplerState IlmMapSampler0 = s13;
+
+HLSLSnippet {
+    float3 col = IlmMapTex0.SampleLevel(IlmMapSampler0, uv, 0).xyz;
+    float3 n = normalize(col);
+    col = saturate(n * dot(n, LightDir));
+}
+```
+
+## Build
+
+### MSBuild (Visual Studio 2022, v143)
+
+```
+MSBuild.exe hlsl_blend_dxbc_translator.sln -p:Configuration=Release -p:Platform=x64
+```
+
+### CMake / MinGW
+
+The project also builds with CMake and MinGW g++ (C++17).
+
+## Usage
+
+```
+hlsl_blend_dxbc_translator.exe -input <file> [-output <out.asm>] [-data <lib dir>]
+```
+
+- `-data` locates the function library directory. Default lookup order:
+  `-data` dir → input file's directory → current directory. The default
+  library is `functions/lib.txt`.
+- `-no-sat-fold` disables `saturate` folding (uses min/max instead) — a debug
+  flag for comparing against the reference output.
+
+## Supported HLSL (beyond the Python original)
+
+The C++ version deliberately exceeds the old Python implementation:
+
+- **Types**: `float`/`int`/`uint`/`bool`/`double`/`half`/`min16*`, vectors and
+  matrices up to 4x4 (matrix *operations* are not yet supported and report an
+  error instead of emitting wrong code)
+- **Full control flow**: `if/else`, `for`, `while`, `switch/case`, `discard`,
+  `break`, `continue`, arbitrary-position `return` in imported functions
+- **Bitwise ops** on int/uint, compound assignment (`+=` `&=` `<<=` ...),
+  prefix/postfix `++/--`
+- **Sampling**: `Sample`, `SampleLevel`, `SampleCmp`, `SampleBias`, `SampleGrad`
+- **~57 intrinsics** including `normalize`, `smoothstep` (mad-based, matching
+  fxc), `mad`, `reflect`, `any/all`, `ddx/ddy`, `fmod`, `radians/degrees`, ...
+- **FXC-standard float comparison** (`lt/ge/eq/ne` are normalized with
+  `and dst, dst, l(0x3f800000)` — this is the standard fix for the fact that
+  DXBC float comparisons return 0 or all-ones/NaN, not 0.0/1.0)
+
+## Verification
+
+- `bash tests/run_tests.sh` — 17 regression tests (real mod shaders + feature
+  tests + assembly structure validation)
+- **fxc cross-validation**: HLSL fragments (including imported functions) are
+  compiled with `fxc -T ps_5_0 -E main -Od -Fc out.asm in.hlsl` and compared
+  against the translator output
+- Read-component comparison against known-good mod output
+- `python tests/validate_asm.py <output>` — structural validator
+
+## Known limitations
+
+Matrix operations, TextureCube/3D sampling (`sample_cube`), array writes /
+dynamic indexing, `do-while`, `struct`, and a handful of exotic intrinsics
+(`atan2`, `reflect` is done but `atan/asin/acos/tan` series expansions are not)
+are not yet implemented. The full gap list is maintained in the project notes.
+
+## References
+
+- **DXC** — primary reference: `https://github.com/microsoft/DirectXShaderCompiler`
+- **vkd3d** — secondary reference: `https://gitlab.winehq.org/wine/vkd3d`
+- **3Dmigoto** — the tool these shaders target
+
+## License
+
+GPL-3.0. See [LICENSE](LICENSE).

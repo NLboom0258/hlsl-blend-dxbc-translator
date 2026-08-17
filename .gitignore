@@ -8,3 +8,10 @@ riderModule.iml
 *.user
 out/
 Translator.bat
+
+# Generated / disassembled test artifacts (not part of the source)
+data/rules.txt
+tests/output.txt
+tests/*-ps.txt
+tests/*-ps-HLSL_pure*.txt
+tests/*-ps-HLSL_v0.5.txt
