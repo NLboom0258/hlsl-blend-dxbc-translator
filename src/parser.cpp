@@ -151,6 +151,21 @@ Expr* Parser::parse_postfix() {
                 return nullptr;
             }
             std::string ident = cur().text;
+            // Normalize rgba swizzles to xyzw (HLSL allows both notations:
+            // .rgb == .xyz). Swizzles may not mix the two alphabets.
+            bool is_rgba = !ident.empty() && ident.size() <= 4;
+            for (char c : ident)
+                if (std::string("rgba").find(c) == std::string::npos) { is_rgba = false; break; }
+            if (is_rgba) {
+                std::string mapped;
+                for (char c : ident) {
+                    if (c == 'r') mapped.push_back('x');
+                    else if (c == 'g') mapped.push_back('y');
+                    else if (c == 'b') mapped.push_back('z');
+                    else mapped.push_back('w');
+                }
+                ident = mapped;
+            }
             // Swizzle: all chars in xyzw and followed by something that isn't '('
             bool is_swizzle = true;
             for (char c : ident)

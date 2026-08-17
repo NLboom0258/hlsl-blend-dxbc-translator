@@ -437,7 +437,7 @@ bool Translator::handle_dxbc_mov(const std::string& line, const std::string& ind
 bool Translator::handle_texture(const std::string& line, const std::string& indent,
                                 std::string& error) {
     // HLSLTexture Texture2D Name = t6;
-    std::string s = strip_comments(line).substr(10);
+    std::string s = strip_comments(line).substr(11);
     while (!s.empty() && (s.front() == ' ' || s.front() == '\t')) s.erase(0, 1);
     while (!s.empty() && (s.back() == ';' || s.back() == ' ' || s.back() == '\t')) s.pop_back();
     size_t eq = s.find('=');
@@ -456,6 +456,7 @@ bool Translator::handle_texture(const std::string& line, const std::string& inde
     }
     if (toks.size() < 2) { error = "HLSLTexture: bad lhs"; return false; }
     std::string alias = toks[toks.size() - 1];
+    std::string tex_type = toks[0];
     std::string slot = rhs;
     while (!slot.empty() && (slot.front() == ' ' || slot.front() == '\t')) slot.erase(0, 1);
     while (!slot.empty() && (slot.back() == ';' || slot.back() == ' ' || slot.back() == '\t')) slot.pop_back();
@@ -474,6 +475,7 @@ bool Translator::handle_texture(const std::string& line, const std::string& inde
     // override is_texture flag
     Symbol* s2 = symtab_->lookup(alias);
     if (s2) s2->is_texture = true;
+    out_->push_back(indent + "// " + tex_type + " " + alias + " bound to " + slot);
     return true;
 }
 
@@ -497,6 +499,7 @@ bool Translator::handle_sampler(const std::string& line, const std::string& inde
     }
     if (toks.size() < 2) { error = "HLSLSampler: bad lhs"; return false; }
     std::string alias = toks[toks.size() - 1];
+    std::string samp_type = toks[0];
     std::string slot = rhs;
     while (!slot.empty() && (slot.front() == ' ' || slot.front() == '\t')) slot.erase(0, 1);
     while (!slot.empty() && (slot.back() == ';' || slot.back() == ' ' || slot.back() == '\t')) slot.pop_back();
@@ -505,6 +508,7 @@ bool Translator::handle_sampler(const std::string& line, const std::string& inde
     symtab_->declare(alias, slot, "xyzw", t, false);
     Symbol* s2 = symtab_->lookup(alias);
     if (s2) s2->is_sampler = true;
+    out_->push_back(indent + "// " + samp_type + " " + alias + " bound to " + slot);
     return true;
 }
 

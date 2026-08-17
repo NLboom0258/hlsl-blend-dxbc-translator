@@ -133,6 +133,24 @@ Python 有而 C++ 缺的项:
 **rules.txt 确认是未使用残留**:C++ 源码没有任何地方读 rules.txt(规则系统已按决定弃用,改用内置 intrinsic 表)。
 `data/rules.txt` 是从 Python 版原样复制的(与 PythonMain/rules.txt 完全一致,3226 字节)。可安全删除,留着仅作历史参考。
 
+### 第二轮补齐(2026-08-17):绑定注释 + 表达式取分量 + rgba swizzle
+
+- **资源绑定注释**:HLSLTexture/HLSLSampler 现在输出 `// Texture2D X bound to t50`(与 Python 完全一致,v0.5 输出 33 条)。
+  顺手修了 `handle_texture` 的 `substr(10)` 潜藏 bug(`HLSLTexture` 是 11 字符,alias 因用 toks.back() 侥幸没暴露)。
+- **表达式取分量 `f(...).xyz`**:修复 member access——`eval(base)` 求值成 operand 再按 swizzle mov。
+  `Tex.SampleLevel(...).xyz`、`float4(1,2,3,4).w`、`(C+Swz).x` 都正确。
+- **rgba swizzle 支持**:`.r/.g/.b/.a` 归一化为 `.x/.y/.z/.w`(HLSL 两种写法都合法),此前 `C.r` 会被误当 struct 成员报错。
+- 回归 15/15(新增 member 测试)。
+
+### C++ 超出 Python 的能力(用户问,2026-08-17)
+
+- 类型:int/uint/bool + 位运算(& | ^ << >> ~)、整数比较、utof、asfloat/asint/asuint
+- 控制流:for/while(loop/breakc/endloop)、switch/case/default、discard、break/continue(Python 只有 if/else)
+- 运算:复合赋值、i++/i--、常量折叠
+- 采样:SampleLevel/SampleCmp/SampleBias/SampleGrad(Python 只有 sample)
+- intrinsic:53 个,新增 any/all、ddx/ddy、rcp、radians/degrees、isnan/isfinite、fmod、sign、select、round/floor/ceil/trunc/frc、distance、rsqrt 等(Python 只有 rules.txt 约 25 个)
+- 浮点比较 fxc 标准归一化、函数展开作用域隔离(优于 Python 名称混淆)
+
 ## 参考位置备忘
 
 - DXC:`E:\Project\Open\DirectXShaderCompiler`

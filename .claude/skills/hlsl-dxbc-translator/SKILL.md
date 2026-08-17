@@ -49,6 +49,12 @@ x64\Release\hlsl_blend_dxbc_translator.exe -input <文件> -output <输出> -dat
 5. **swizzle 填充**:复制第一个有效分量(`xy→xyxx`, `xyz→xyzx`, `zw→zwzz`),匹配 fxc/3Dmigoto 惯例。
 6. **寄存器分配**:临时用后即还(free list);变量与临时生命周期不要重叠(复用冲突)。
 7. **HLSLInit**:清零所有分配过的寄存器,避免脏数据。
+8. **rgba swizzle 归一化**:HLSL 允许 `.rgb`/`.rgba`,parser 里非 xyzw 的成员名若全在 `rgba` 中要映射为 `xyzw`
+   (`r→x g→y b→z a→w`),否则 `C.r` 会被当成 struct 成员走进 member access 报错。
+9. **表达式取分量 `f(...).xyz`**:member access 处理——`eval(base)` 求值成 operand,再 `format_src(reg, swizzle, dm)` 发 mov;
+   operand 为立即数时手动按 swizzle 挑分量再 `format_imm`。简单变量取分量走 VarRef 的 mask 路径(parser 里已合并)。
+10. **资源绑定注释**:HLSLTexture/HLSLSampler 输出 `// Texture2D X bound to t50`(与 Python 一致),便于读输出。
+    注意 `HLSLTexture` 是 11 字符,`substr(11)`(曾误用 10)。
 
 ## 验证方法论(改完必须验证)
 

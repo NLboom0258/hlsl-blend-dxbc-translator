@@ -151,6 +151,19 @@ HLSLSnippet {
 EOF
 check "边界情况+新intrinsic" "$TMP/t_edge.txt"
 
+# member access on expressions + rgba swizzle + binding comments
+cat > "$TMP/t_member.txt" << 'EOF'
+HLSLTexture Texture2D IlmMapTex0 = t50;
+HLSLSampler SamplerState IlmMapSampler0 = s13;
+HLSL float2 UV = float2(0.5, 0.5);
+HLSL float3 C = IlmMapTex0.SampleLevel(IlmMapSampler0, UV, 0).xyz;
+HLSL float R = C.r;
+HLSL float3 Swz = C.zyx;
+HLSL float W = float4(1, 2, 3, 4).w;
+HLSL float S = (C + Swz).x;
+EOF
+check "member访问+rgba+绑定注释" "$TMP/t_member.txt"
+
 echo
 echo "===== 结果: $pass 通过, $fail 失败 ====="
 [ "$fail" = "0" ]

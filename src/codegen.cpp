@@ -381,9 +381,30 @@ bool CodeGen::gen_internal(Expr* e, const std::string& target_str) {
     case Expr::Kind::Sample: return gen_sample(e, target_str);
     case Expr::Kind::Cast: return gen_cast(e, target_str);
     case Expr::Kind::Index: return gen_index(e, target_str);
-    case Expr::Kind::Member:
-        error_ = "member access not supported: " + e->name;
-        return false;
+    case Expr::Kind::Member: {
+        // Swizzle access on a non-var expression (e.g. sample result): eval the
+        // base into an operand, then read the selected components.
+        bool swz = !e->name.empty();
+        for (char c : e->name)
+            if (std::string("xyzw").find(c) == std::string::npos) { swz = false; break; }
+        if (!swz) { error_ = "member access not supported: " + e->name; return false; }
+        std::vector<std::string> temps;
+        Operand op;
+        if (!eval(e->operand, op, temps)) return false;
+        std::string dm = target_mask_of(target_str);
+        if (op.is_immediate) {
+            std::vector<double> sw;
+            for (char c : e->name) {
+                int idx = (int)std::string("xyzw").find(c);
+                sw.push_back(idx < (int)op.vals.size() ? op.vals[idx] : 0.0);
+            }
+            emit("mov" + sat_suffix() + " " + target_str + ", " + format_imm(sw, dm));
+        } else {
+            emit("mov" + sat_suffix() + " " + target_str + ", " + format_src(op.reg, e->name, dm));
+        }
+        for (auto& t : temps) sym.free_temp(t);
+        return true;
+    }
     }
     error_ = "unsupported expression kind";
     return false;
