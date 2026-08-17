@@ -65,9 +65,10 @@ The project also builds with CMake and MinGW g++ (C++17).
 hlsl_blend_dxbc_translator.exe -input <file> [-output <out.asm>] [-data <lib dir>]
 ```
 
-- `-data` locates the function library directory. Default lookup order:
-  `-data` dir → input file's directory → current directory. The default
-  library is `functions/lib.txt`.
+- `-data` adds a search directory for libraries referenced by
+  `HLSLFunctionImport`. Lookup order: `-data` dir → input file's directory →
+  current directory. There is no default library — only files referenced by an
+  `HLSLFunctionImport` marker are loaded.
 - `-no-sat-fold` disables `saturate` folding (uses min/max instead) — a debug
   flag for comparing against the reference output.
 

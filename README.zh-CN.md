@@ -60,8 +60,8 @@ MSBuild.exe hlsl_blend_dxbc_translator.sln -p:Configuration=Release -p:Platform=
 hlsl_blend_dxbc_translator.exe -input <文件> [-output <输出.asm>] [-data <函数库目录>]
 ```
 
-- `-data` 指定函数库目录。默认查找顺序:`-data` 目录 → 输入文件所在目录 → 当前目录。
-  默认函数库是 `functions/lib.txt`。
+- `-data` 指定函数库查找目录(用于 `HLSLFunctionImport` 相对路径)。查找顺序:`-data` 目录 →
+  输入文件所在目录 → 当前目录。没有默认函数库——只有 `HLSLFunctionImport` 标记引用的文件才会被加载。
 - `-no-sat-fold` 禁用 saturate 折叠(改用 min/max)——排查用调试参数。
 
 ## 函数库
