@@ -142,6 +142,18 @@ Python 有而 C++ 缺的项:
 - **rgba swizzle 支持**:`.r/.g/.b/.a` 归一化为 `.x/.y/.z/.w`(HLSL 两种写法都合法),此前 `C.r` 会被误当 struct 成员报错。
 - 回归 15/15(新增 member 测试)。
 
+### HLSL 标准差距盘点(2026-08-17,用户问)
+
+按实用优先级排列,均实测确认:
+1. **矩阵静默出错(高风险)**:`float4x4(...)` 构造只取第一个参数当 cast,`mul(M,V)` 是分量乘非矩阵乘,
+   transpose/determinant 缺失。类型能解析,但运算静默输出错值 —— 建议至少先改成报错。
+2. **TextureCube/3D/2DArray 采样**:能绑定但只发 2D sample 系列(缺 sample_cube、3D UV);缺 Load/Gather/SampleCmpLevelZero。
+3. **数组**:能声明+常量索引读,缺 braced 初始化、写入 arr[i]=x、动态索引。
+4. **控制流/操作符**:缺 do-while、前置 ++i/--i、位复合赋值(&= |= ^= <<= >>=)、函数重载(静默覆盖)、递归(会无限展开)。
+5. **内置函数缺失**:tan/asin/acos/atan/atan2、sinh/cosh/tanh、faceforward/reflect/refract/lit、mad/modf/frexp/ldexp/isinf、
+   reversebits/countbits/firstbithigh/firstbitlow、fwidth/ddx_coarse/fine/ddy_coarse/fine、clip、transpose/determinant。
+6. **struct 完全不支持**;预处理器/cbuffer/属性在 3Dmigoto 标记格式中一般不出现,影响小。
+
 ### C++ 超出 Python 的能力(用户问,2026-08-17)
 
 - 类型:int/uint/bool + 位运算(& | ^ << >> ~)、整数比较、utof、asfloat/asint/asuint

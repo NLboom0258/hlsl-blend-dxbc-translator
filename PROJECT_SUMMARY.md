@@ -117,6 +117,8 @@ HLSL `sincos(angle, out_sin, out_cos)` → DXBC **`sincos <sin>, <angle>, <cos>`
   handle_texture substr(10) 潜藏 bug、资源绑定注释(`// Texture2D X bound to t50`,与 Python 一致)
 - **待办**:
   - 用户游戏内最终测试确认主光/阴影正常
-  - 已知限制:向量动态索引、矩阵表达式、atan2 等复杂三角、snippet 内嵌 HLSLMov/DXBCMov(架构差异暂缺)均未实现
+  - **矩阵静默出错(高风险)**:`float4x4(...)` 构造/`mul(M,v)` 输出错值不报错,应先改成报错
+  - 完整差距清单见 `PROJECT_NOTES.md`「HLSL 标准差距盘点」;要点:TextureCube/3D 采样、数组写入、
+    do-while、前置 ++、位复合赋值、~25 个标准内置函数(atan2/reflect/mad 等)、struct
 - 活文档:`PROJECT_NOTES.md`(详细进度、每个 bug 的修复记录)
 - 持久记忆:`C:\Users\wk135\.claude\projects\E--Project-Cpp-hlsl-blend-dxbc-translator\memory\`
