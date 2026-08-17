@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdio>
 #include <cstdlib>
 #include <regex>
 
@@ -57,20 +58,32 @@ bool Translator::load_function_libraries(const std::vector<std::string>& lines, 
         std::smatch m;
         if (std::regex_match(stripped, m, import_re)) {
             std::string rel = m[1].str();
-            // Try, in order: data_dir, input dir (if set), cwd.
-            std::vector<std::string> candidates;
-            if (!data_dir_.empty()) candidates.push_back(data_dir_);
-            if (!input_dir_.empty()) candidates.push_back(input_dir_);
-            candidates.push_back(".");
+            // Absolute path (drive letter or leading separator) is used directly.
+            bool is_abs = rel.size() >= 2 && rel[1] == ':';
+            if (!is_abs && !rel.empty() && (rel[0] == '\\' || rel[0] == '/')) is_abs = true;
             FILE* f = nullptr;
+            std::vector<std::string> candidates;
+            if (is_abs) {
+                candidates.push_back(rel);
+            } else {
+                // Try, in order: data_dir, input dir (if set), cwd.
+                if (!data_dir_.empty()) candidates.push_back(data_dir_);
+                if (!input_dir_.empty()) candidates.push_back(input_dir_);
+                candidates.push_back(".");
+            }
             for (std::string base : candidates) {
-                std::string path = base + "\\" + rel;
+                std::string path = is_abs ? rel : base + "\\" + rel;
                 for (auto& c : path) if (c == '/') c = '\\';
                 f = fopen(path.c_str(), "rb");
                 if (f) break;
             }
             if (!f) {
-                error = "function library not found: " + rel;
+                error = "function library not found: " + rel + " (searched: ";
+                for (size_t k = 0; k < candidates.size(); ++k) {
+                    if (k) error += ", ";
+                    error += candidates[k];
+                }
+                error += ")";
                 return false;
             }
             std::string src;
@@ -80,8 +93,11 @@ bool Translator::load_function_libraries(const std::vector<std::string>& lines, 
             fclose(f);
             std::map<std::string, FunctionDef> defs;
             parse_function_library(src, defs);
-            for (auto& kv : defs)
+            for (auto& kv : defs) {
+                if (functions_.count(kv.first))
+                    fprintf(stderr, "Warning: function '%s' redefined by %s\n", kv.first.c_str(), rel.c_str());
                 functions_[kv.first] = kv.second;
+            }
         }
     }
     return true;

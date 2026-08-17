@@ -112,10 +112,11 @@ HLSL `sincos(angle, out_sin, out_cos)` → DXBC **`sincos <sin>, <angle>, <cos>`
 ## 八、当前状态
 
 - 核心翻译器完成,~65 个 intrinsic,MSVC+MinGW 双构建,14 项回归通过
-- 已修复:浮点比较 NaN(根因)、saturate 嵌套折叠、sincos 参数、函数局部遮蔽、swizzle 惯例、显式 swizzle 保留
+- 已修复:浮点比较 NaN(根因)、saturate 嵌套折叠、sincos 参数、函数局部遮蔽、swizzle 惯例、显式 swizzle 保留、
+  函数库绝对路径导入、重定义警告、缺失库报错列出搜索路径
 - **待办**:
   - 用户游戏内最终测试确认主光/阴影正常
-  - 清理 tests/ 里用户加的调试代码(`Test`/`r200`/`Test.x = PointLightShadow`)
-  - 已知限制:向量动态索引、矩阵表达式、atan2 等复杂三角未实现
+  - 已知限制:向量动态索引、矩阵表达式、atan2 等复杂三角、snippet 内嵌 HLSLMov/DXBCMov(架构差异暂缺)、
+    函数调用结果直接取分量(`f(...).xyz`)均未实现
 - 活文档:`PROJECT_NOTES.md`(详细进度、每个 bug 的修复记录)
 - 持久记忆:`C:\Users\wk135\.claude\projects\E--Project-Cpp-hlsl-blend-dxbc-translator\memory\`

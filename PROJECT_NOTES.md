@@ -13,7 +13,7 @@
 
 **会话开始时间**:2026-08-16
 **当前阶段**:主光/阴影问题已修复,用户确认现有案例正常 ✅;已创建总结文件 + skill
-**检查点(2026-08-17,上下文压缩前)**:核心翻译器完成、浮点比较修复、saturate 折叠修复、sincos 标准修复;调试代码已清理;`tests/` 已还原;待办见下
+**检查点(2026-08-17,上下文压缩后)**:与 Python 版全面对比(外部 AI 逐条核对,5 条全部属实)→ 修复绝对路径导入 + 重定义警告 + 缺失库报错列出搜索路径;snippet 内嵌标记暂不改(已给用户看法);rules.txt 确认是未使用残留
 
 阶段进度:
 - [x] 通读 Python 源码、规则、测试样例;确认构建环境与 DXC 位置
@@ -110,6 +110,28 @@ Python 版只支持 float/float2/3/4 + 基本运算。C++ 版扩展了:
 - **我的翻译器行为**:与 Python 版一致,该行输出 `// Error: DXBCMov: variable not defined: OffsetDirShadowUV2` 注释,其余继续翻译,不崩溃。
 - **建议**:如果这是笔误,把 `OffsetDirShadowUV2` 改成 `OffsetDirShadowUV1`,或补一个 `HLSLMov float2 OffsetDirShadowUV2 = ...`。改完后这行就能正确翻译。
 - (Python 版同样会在此报错,这是原文件的问题,不是 C++ 版引入的。)
+
+## 与 Python 版全面对比(2026-08-17,外部 AI 逐条核对,5 条全部属实)
+
+对比结论:C++ 版在函数展开(作用域 vs 名称混淆)、浮点比较归一化、swizzle 一致性、控制流、类型系统上都是实质改进。
+Python 有而 C++ 缺的项:
+
+1. **snippet 内嵌 HLSLMov/DXBCMov 不支持** —— 真实功能缺口,但已确认**架构使然而非实际需求**:
+   Python 的 `_process_statements` 是统一逐行处理循环(snippet/if/else/函数体共用),标记前缀判断顺手加上,天然支持;
+   C++ 有真正的 HLSL Parser,snippet 内容整体交给 Parser。真实 shader 里 HLSLMov/DXBCMov 都在汇编块之间的顶层,
+   一般不会混进 snippet。**用户拍板暂不改**,遇到再说。
+2. **绝对路径导入函数库不支持** —— **已修复**:原来 `base + "\\" + rel` 硬拼,绝对路径必失败;
+   现在检测 `盘符:` / 前导 `\`/`/`,绝对路径直接使用。
+3. **函数库缺失时全盘终止** —— 保持严格终止(翻译要么对要么错),但**报错信息现在列出搜索过的候选路径**,便于定位:
+   `function library not found: xxx (searched: data目录, 输入目录, .)`。
+4. **函数重定义无警告** —— **已修复**:后加载的库覆盖同名函数时向 stderr 打印
+   `Warning: function 'xxx' redefined by <路径>`。
+
+附带发现(外部 AI 未报告):`Tex.SampleLevel(...).xyz` 这种"函数调用结果直接取分量"报
+`member access not supported` —— 已知限制,无测试案例触发,暂不处理。
+
+**rules.txt 确认是未使用残留**:C++ 源码没有任何地方读 rules.txt(规则系统已按决定弃用,改用内置 intrinsic 表)。
+`data/rules.txt` 是从 Python 版原样复制的(与 PythonMain/rules.txt 完全一致,3226 字节)。可安全删除,留着仅作历史参考。
 
 ## 参考位置备忘
 
