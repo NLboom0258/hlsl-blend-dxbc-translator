@@ -64,6 +64,16 @@ hlsl_blend_dxbc_translator.exe -input <文件> [-output <输出.asm>] [-data <�
   默认函数库是 `functions/lib.txt`。
 - `-no-sat-fold` 禁用 saturate 折叠(改用 min/max)——排查用调试参数。
 
+## 函数库
+
+本翻译器没有"内置标准库"。所有 HLSL 指令和语法都是内置的;`HLSLFunctionImport`
+只是自定义函数的扩展机制,不是必需依赖。
+
+`data/functions/lib.txt` 是一个**参考示例**,不是标准库。其中的函数是为特定 mod
+配套编写的——即 tests/ 里的 M2 全局光照 v0.5 测试 shader,由那个 shader 使用。它们
+写于早期翻译器时期,当时语法支持有限,代码比较粗糙(例如 ID 切换是硬编码的 if/else
+嵌套)。把它当作编写自定义函数库的语法参考即可,不建议直接照搬使用。
+
 ## 支持的 HLSL
 
 - **类型**:`float`/`int`/`uint`/`bool`/`double`/`half`/`min16*`、向量和 4x4 以内矩阵

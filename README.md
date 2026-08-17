@@ -71,6 +71,20 @@ hlsl_blend_dxbc_translator.exe -input <file> [-output <out.asm>] [-data <lib dir
 - `-no-sat-fold` disables `saturate` folding (uses min/max instead) — a debug
   flag for comparing against the reference output.
 
+## Function libraries
+
+The translator has no bundled "standard library". All HLSL instructions and
+syntax are built in; `HLSLFunctionImport` is an extension mechanism for
+user-defined functions, not a required dependency.
+
+The `data/functions/lib.txt` file is a **reference example**, not a standard
+library. Its functions were written to fit a specific mod — the M2 global
+lighting v0.5 test shader in `tests/` — and are used by that shader. They date
+from the early days of the predecessor translator, when syntax support was
+limited, so the code is rough in places (e.g. ID switching is done with
+hard-coded nested `if/else`). Treat the file as a syntax reference for writing
+your own function library rather than something to rely on as-is.
+
 ## Supported HLSL
 
 - **Types**: `float`/`int`/`uint`/`bool`/`double`/`half`/`min16*`, vectors and
