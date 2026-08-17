@@ -1,17 +1,22 @@
 # HLSL Blend DXBC Translator
 
-A C++17 translator for **3Dmigoto ShaderFixes** that converts files mixing DXBC
-shader assembly with embedded HLSL snippets back into pure DXBC SM5 assembly.
+[English](README.md) | [中文](README.zh-CN.md)
 
-Input files for 3Dmigoto shader modding are usually disassembled DXBC assembly
-with a few hand-written HLSL fragments (for math that is painful to write in raw
-assembly). This tool parses those mixed files, translates every HLSL fragment to
-correct DXBC SM5 instructions, and emits a ready-to-deploy pure-assembly shader.
+A C++17 translator that converts shaders written as a **mix of DXBC SM5
+assembly text and embedded HLSL fragments** back into **pure DXBC SM5 assembly
+text**.
+
+The DXBC assembly format is the standard disassembly output of the Microsoft
+HLSL shader compiler (fxc) — the same format used by 3Dmigoto and other
+shader-modding tools. A "blend" file is normal DXBC assembly with a few HLSL
+markers sprinkled in, so math that is awkward to express in raw assembly can be
+written in HLSL instead. This tool parses those files and translates every HLSL
+fragment into correct DXBC SM5 instructions.
 
 This is a from-scratch C++ rewrite of an earlier Python prototype. The
-translation logic follows the official compilers — DXC (`DirectXShaderCompiler`)
-as the primary reference, vkd3d as a secondary one — rather than the ad-hoc
-logic of the old Python version.
+translation logic follows the official compilers — DXC
+(`DirectXShaderCompiler`) as the primary reference, vkd3d as a secondary one —
+rather than the ad-hoc logic of the old Python version.
 
 ## The 8 marker syntax
 
@@ -31,8 +36,8 @@ Non-marker lines are passed through verbatim. Markers are translated:
 Example:
 
 ```
-Texture2D IlmMapTex0 = t50;
-SamplerState IlmMapSampler0 = s13;
+HLSLTexture Texture2D IlmMapTex0 = t50;
+HLSLSampler SamplerState IlmMapSampler0 = s13;
 
 HLSLSnippet {
     float3 col = IlmMapTex0.SampleLevel(IlmMapSampler0, uv, 0).xyz;
@@ -90,21 +95,21 @@ The C++ version deliberately exceeds the old Python implementation:
 - **fxc cross-validation**: HLSL fragments (including imported functions) are
   compiled with `fxc -T ps_5_0 -E main -Od -Fc out.asm in.hlsl` and compared
   against the translator output
-- Read-component comparison against known-good mod output
+- Read-component comparison against known-good reference output
 - `python tests/validate_asm.py <output>` — structural validator
 
 ## Known limitations
 
 Matrix operations, TextureCube/3D sampling (`sample_cube`), array writes /
 dynamic indexing, `do-while`, `struct`, and a handful of exotic intrinsics
-(`atan2`, `reflect` is done but `atan/asin/acos/tan` series expansions are not)
-are not yet implemented. The full gap list is maintained in the project notes.
+(`atan/asin/acos/tan` series expansions, etc.) are not yet implemented. The
+full gap list is maintained in the project notes.
 
 ## References
 
 - **DXC** — primary reference: `https://github.com/microsoft/DirectXShaderCompiler`
 - **vkd3d** — secondary reference: `https://gitlab.winehq.org/wine/vkd3d`
-- **3Dmigoto** — the tool these shaders target
+- **3Dmigoto** — a shader-modding tool that consumes this assembly format
 
 ## License
 
