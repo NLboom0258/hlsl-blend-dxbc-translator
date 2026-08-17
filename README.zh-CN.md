@@ -10,8 +10,9 @@ DXBC 汇编格式是微软 HLSL 着色器编译器(fxc)的标准反汇编输出�
 写起来很麻烦的数学运算可以直接用 HLSL 写。本工具解析这些文件,把每个 HLSL 片段翻译成
 正确的 DXBC SM5 指令。
 
-这是对早期 Python 原型的一次从头重写。翻译逻辑参考官方编译器——以 DXC(`DirectXShaderCompiler`)
-为主、vkd3d 为辅——而不是沿用 Python 版不成熟的逻辑。
+本项目由 AI Agent 深度参与编写,大部分代码由 AI 生成。它是对作者此前用 Python
+编写的原型的 C++ 重构——那个 Python 原型定义了工具的输入/输出格式和行为。
+翻译逻辑参考官方编译器——以 DXC(`DirectXShaderCompiler`)为主、vkd3d 为辅——以保证正确性。
 
 ## 8 种标记语法
 
@@ -80,7 +81,7 @@ C++ 版刻意超越旧的 Python 实现:
 
 ## 验证
 
-- `bash tests/run_tests.sh` — 17 项回归测试(真实 mod shader + 特性测试 + 汇编结构验证)
+- `bash tests/run_tests.sh` — 12 项回归测试(真实 mod shader + 特性测试 + 汇编结构验证)
 - **fxc 交叉验证**:把 HLSL 片段(含导入函数)用 `fxc -T ps_5_0 -E main -Od -Fc out.asm in.hlsl`
   编译,与翻译器输出对比
 - 与已知正确的参考输出做被读分量对比

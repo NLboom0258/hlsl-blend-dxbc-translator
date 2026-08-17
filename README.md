@@ -13,10 +13,11 @@ markers sprinkled in, so math that is awkward to express in raw assembly can be
 written in HLSL instead. This tool parses those files and translates every HLSL
 fragment into correct DXBC SM5 instructions.
 
-This is a from-scratch C++ rewrite of an earlier Python prototype. The
-translation logic follows the official compilers — DXC
-(`DirectXShaderCompiler`) as the primary reference, vkd3d as a secondary one —
-rather than the ad-hoc logic of the old Python version.
+This project was written with heavy assistance from an AI agent, which authored
+most of the code. It is a C++ rewrite of the author's earlier Python prototype,
+which defined the input/output format and behavior. The translation logic
+follows the official compilers — DXC (`DirectXShaderCompiler`) as the primary
+reference, vkd3d as a secondary one — for correctness.
 
 ## The 8 marker syntax
 
@@ -90,7 +91,7 @@ The C++ version deliberately exceeds the old Python implementation:
 
 ## Verification
 
-- `bash tests/run_tests.sh` — 17 regression tests (real mod shaders + feature
+- `bash tests/run_tests.sh` — 12 regression tests (a real mod shader + feature
   tests + assembly structure validation)
 - **fxc cross-validation**: HLSL fragments (including imported functions) are
   compiled with `fxc -T ps_5_0 -E main -Od -Fc out.asm in.hlsl` and compared

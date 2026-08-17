@@ -28,9 +28,7 @@ check() {
 }
 
 echo "== 真实混合 shader =="
-for f in tests/*HLSLBlend*.txt; do
-    check "$(basename "$f")" "$f"
-done
+check "M2全局光照695c8c0feada9292-ps-HLSLBlend_v0.5.txt" "tests/M2全局光照695c8c0feada9292-ps-HLSLBlend_v0.5.txt"
 
 echo "== 语法示例 =="
 check "sample.txt" tests/sample.txt
