@@ -350,8 +350,16 @@ bool Translator::handle_hlsl_mov(const std::string& line, const std::string& ind
         return false;
     }
     if (has_type && type.is_matrix()) {
-        error = "HLSLMov: matrix types not supported";
-        return false;
+        // Matrix binding: base register + row count. No mov is emitted; the
+        // matrix rows live in consecutive registers (cb0[0]..cb0[3], r5..r7).
+        std::string base, m2;
+        bool neg2;
+        parse_register_source(rhs, base, m2, neg2);
+        std::string mask = std::string("xyzw").substr(0, (size_t)std::min<int>(type.cols, 4));
+        symtab_->reserve_regs(base, type.rows);
+        if (!symtab_->lookup_current_scope(var_name))
+            symtab_->declare(var_name, base, mask, type, false);
+        return true;
     }
 
     Symbol* existing = symtab_->lookup(var_name);
@@ -650,7 +658,7 @@ bool Translator::translate_stmt(Stmt* s, const std::string& indent, std::string&
         out_->push_back(indent + "continue");
         return true;
     case Stmt::Kind::Discard:
-        out_->push_back(indent + "discard");
+        out_->push_back(indent + "discard_nz l(-1)");  // unconditional discard (matches fxc)
         return true;
     case Stmt::Kind::Switch:
         return translate_switch(s, indent, error);
@@ -662,8 +670,19 @@ bool Translator::translate_stmt(Stmt* s, const std::string& indent, std::string&
 }
 
 bool Translator::translate_decl(Stmt* s, const std::string& indent, std::string& error) {
-    if (s->type.is_matrix()) { error = "matrix types not supported"; return false; }
     std::string name = s->name;
+    if (s->type.is_matrix()) {
+        // Matrix variable: allocate `rows` consecutive registers.
+        if (s->init) { error = "matrix assignment not supported"; return false; }
+        int rows = s->type.rows;
+        int cols = s->type.cols;
+        std::string base = symtab_->alloc_matrix(rows);
+        std::string mask = std::string("xyzw").substr(0, (size_t)std::min<int>(cols, 4));
+        symtab_->declare(name, base, mask, s->type, true);
+        for (int i = 0; i < rows; ++i)
+            out_->push_back(indent + "mov " + CodeGen::reg_plus(base, i) + "." + mask + ", l(0)");
+        return true;
+    }
     // Only a declaration in the *current* scope is a redeclare; a name that
     // exists only in an outer scope (e.g. a function-local shadowing a caller
     // variable) must allocate a fresh register.

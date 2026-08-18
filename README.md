@@ -89,15 +89,16 @@ your own function library rather than something to rely on as-is.
 ## Supported HLSL
 
 - **Types**: `float`/`int`/`uint`/`bool`/`double`/`half`/`min16*`, vectors and
-  matrices up to 4x4 (matrix *operations* are not yet supported and report an
-  error instead of emitting wrong code)
+  matrices up to 4x4. Matrix math is supported (`mul(M,v)`, `mul(v,M)`,
+  `(float3x3)` casts) with **column-major** semantics, fxc-verified.
 - **Full control flow**: `if/else`, `for`, `while`, `switch/case`, `discard`,
   `break`, `continue`, arbitrary-position `return` in imported functions
 - **Bitwise ops** on int/uint, compound assignment (`+=` `&=` `<<=` ...),
   prefix/postfix `++/--`
 - **Sampling**: `Sample`, `SampleLevel`, `SampleCmp`, `SampleBias`, `SampleGrad`
-- **~57 intrinsics** including `normalize`, `smoothstep` (mad-based, matching
-  fxc), `mad`, `reflect`, `any/all`, `ddx/ddy`, `fmod`, `radians/degrees`, ...
+- **~59 intrinsics** including `normalize`, `smoothstep` (mad-based, matching
+  fxc), `mad`, `reflect`, `clip`, `fwidth`, `any/all`, `ddx/ddy`, `fmod`,
+  `radians/degrees`, ...
 - **FXC-standard float comparison** (`lt/ge/eq/ne` are normalized with
   `and dst, dst, l(0x3f800000)` — this is the standard fix for the fact that
   DXBC float comparisons return 0 or all-ones/NaN, not 0.0/1.0)
@@ -114,10 +115,10 @@ your own function library rather than something to rely on as-is.
 
 ## Known limitations
 
-Matrix operations, TextureCube/3D sampling (`sample_cube`), array writes /
-dynamic indexing, `do-while`, `struct`, and a handful of exotic intrinsics
-(`atan/asin/acos/tan` series expansions, etc.) are not yet implemented. The
-full gap list is maintained in the project notes.
+TextureCube/3D sampling (`sample_cube`), array writes / dynamic indexing,
+`do-while`, `struct`, `transpose`, `mul(M1, M2)` (matrix × matrix), and a
+handful of exotic intrinsics (`atan/asin/acos/tan` series expansions, etc.) are
+not yet implemented. The full gap list is maintained in the project notes.
 
 ## References
 

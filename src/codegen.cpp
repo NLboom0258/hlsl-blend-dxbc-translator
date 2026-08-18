@@ -2,6 +2,7 @@
 #include "codegen.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdio>
 #include <cstdlib>
 
@@ -111,6 +112,21 @@ std::string CodeGen::target_mask_of(const std::string& target) {
     size_t dot = target.rfind('.');
     if (dot == std::string::npos) return "xyzw";
     return target.substr(dot + 1);
+}
+
+std::string CodeGen::reg_plus(const std::string& base, int i) {
+    size_t br = base.find('[');
+    if (br != std::string::npos) {
+        // "cb0[3]" -> "cb0[4]"
+        size_t e = base.find(']', br);
+        int idx = std::atoi(base.substr(br + 1, e - br - 1).c_str());
+        return base.substr(0, br + 1) + std::to_string(idx + i) + base.substr(e);
+    }
+    // "r5" -> "r6"
+    size_t d = 0;
+    while (d < base.size() && !std::isdigit((unsigned char)base[d])) ++d;
+    int idx = std::atoi(base.c_str() + d);
+    return base.substr(0, d) + std::to_string(idx + i);
 }
 
 CodeGen::CodeGen(SymbolTable& symtab, Arena& arena, std::vector<std::string>& out)

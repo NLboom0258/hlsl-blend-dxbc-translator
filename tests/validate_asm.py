@@ -8,13 +8,14 @@ import sys
 # (Passthrough mnemonics not listed are only structurally checked.)
 EXPECTED = {
     'add': 3, 'and': 3, 'div': 3, 'dp2': 3, 'dp3': 3, 'dp4': 3, 'eq': 3,
+    'deriv_rtx': 2, 'deriv_rty': 2, 'discard_nz': 1,
     'exp': 2, 'frc': 2, 'ftoi': 2, 'ftou': 2, 'ge': 3, 'iadd': 3, 'idiv': 3,
     'ieq': 3, 'if_nz': 1, 'if_z': 1, 'imul': 3, 'ine': 3, 'inot': 2,
     'ishl': 3, 'ishr': 3, 'itof': 2, 'log': 2, 'lt': 3, 'mad': 4, 'mad_sat': 4,
     'max': 3, 'min': 3, 'mov': 2, 'mov_sat': 2, 'movc': 4, 'mul': 3,
     'mul_sat': 3, 'ne': 3, 'not': 2, 'or': 3, 'rcp': 2, 'round_ne': 2,
     'round_ni': 2, 'round_pi': 2, 'round_z': 2, 'rsq': 2, 'sample': 4,
-    'sample_b': 5, 'sample_c': 5, 'sample_d': 6,
+    'sample_b': 5, 'sample_c': 5, 'sample_c_lz': 5, 'sample_d': 6,
     'sincos': 3, 'sqrt': 2, 'udiv': 3, 'uge': 3, 'ult': 3, 'umod': 3,
     'ushr': 3, 'utof': 2, 'xor': 3,
 }

@@ -198,6 +198,33 @@ else
     echo "FAIL(矩阵崩溃): 矩阵"; fail=$((fail+1))
 fi
 
+# clip / fwidth / derivative instruction names (3Dmigoto-valid mnemonics)
+cat > "$TMP/t_clip.txt" << 'EOF'
+HLSL float Alpha = 0.5;
+HLSL float3 N = float3(0, 0, 1);
+HLSLSnippet {
+    clip(Alpha - 0.3);
+    float3 f = fwidth(N);
+    float3 dx = ddx(N);
+    float3 dy = ddy(N);
+    if (Alpha < 0.0) {
+        discard;
+    }
+}
+EOF
+check "clip/fwidth/deriv指令名" "$TMP/t_clip.txt"
+
+# matrix mul with column-major semantics (fxc-verified lowering)
+cat > "$TMP/t_mat2.txt" << 'EOF'
+HLSLMov float4x4 ObjectToWorld = cb0[0];
+HLSLMov float3x3 TBN = r5.xyzw;
+HLSL float3 N = float3(0, 0, 1);
+HLSL float3 A = mul((float3x3)ObjectToWorld, N);
+HLSL float3 B = mul(N, TBN);
+HLSL float3 C = mul(TBN, N);
+EOF
+check "矩阵mul(列优先语义)" "$TMP/t_mat2.txt"
+
 echo
 echo "===== 结果: $pass 通过, $fail 失败 ====="
 [ "$fail" = "0" ]

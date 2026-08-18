@@ -55,6 +55,13 @@ x64\Release\hlsl_blend_dxbc_translator.exe -input <文件> -output <输出> -dat
    operand 为立即数时手动按 swizzle 挑分量再 `format_imm`。简单变量取分量走 VarRef 的 mask 路径(parser 里已合并)。
 10. **资源绑定注释**:HLSLTexture/HLSLSampler 输出 `// Texture2D X bound to t50`(与 Python 一致),便于读输出。
     注意 `HLSLTexture` 是 11 字符,`substr(11)`(曾误用 10)。
+11. **矩阵 mul 是列优先(cbuffer 语义)**:float4x4 M 绑定 cb0[0] 时,base[j] 是 M 的第 j **列**。
+    `mul(M,v)` 输出 i = dot(第 i 行, v),第 i 行 = 跨每寄存器的第 i 分量,需组装临时再 dp3;
+    `mul(v,M)` 输出 j = dot(v, base[j]) 直接 dp3。两者实现易写反,fxc 交叉验证才能发现。
+    矩阵变量占 rows 个连续寄存器,绑定后要 reserve_regs 防临时冲突。
+12. **3Dmigoto 指令名(D3D_Shaders/Assembler.cpp 权威)**:derivative 是 `deriv_rtx`/`deriv_rty`(非 ddx/ddy);
+    discard 是 `discard_nz`/`discard_z`(非 discard,无条件用 `discard_nz l(-1)`);
+    sample 支持非 `_indexable` 简化变体;fwidth 无指令需展开(deriv_rtx+abs+deriv_rty+abs+add)。
 
 ## 验证方法论(改完必须验证)
 

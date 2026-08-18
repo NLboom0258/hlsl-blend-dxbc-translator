@@ -175,6 +175,64 @@ Python 有而 C++ 缺的项:
 - intrinsic:53 个,新增 any/all、ddx/ddy、rcp、radians/degrees、isnan/isfinite、fmod、sign、select、round/floor/ceil/trunc/frc、distance、rsqrt 等(Python 只有 rules.txt 约 25 个)
 - 浮点比较 fxc 标准归一化、函数展开作用域隔离(优于 Python 名称混淆)
 
+## 会话分工(2026-08-17,用户确认)
+
+- **本对话 = 翻译器中枢**:改 bug、加功能、验证输出都在这里。
+- **mod 编写单开对话**:新对话读 PROJECT_SUMMARY/SKILL/PROJECT_NOTES/README 后写 HLSLBlend。
+- 出问题(翻译器报错/输出可疑)→ 截最小复现片段回本对话定位修复。
+
+## lilToon 复刻 mod 需求 + 技术验证(2026-08-17)
+
+用户要在 DMC5 用本翻译器复刻 Unity lilToon 效果(风格化渲染),作为翻译器实战测试。
+需求来自另一侧 Agent 分析(lilToon 函数统计)+ 我用 fxc/3Dmigoto 源码实测确认:
+
+**fxc + 3Dmigoto 源码实测结论(E:\Project\Open\3Dmigoto, D3D_Shaders/Assembler.cpp 指令表)**:
+
+| 功能 | 3Dmigoto 接受的指令 | 实现 |
+|---|---|---|
+| clip(x) | `discard_nz` | `lt t,x,l(0)` + `discard_nz t`(fxc 实测如此;**不需要** and l(0x3f800000),discard_nz 只测非零) |
+| 无条件 discard 语句 | `discard_nz` | **现有 bug**:发 `discard`,3Dmigoto 指令表无此名 → 改 `discard_nz l(-1)`(fxc 实测生成) |
+| ddx/ddy | `deriv_rtx`/`deriv_rty` | **现有 bug**:发 `ddx`/`ddy`,3Dmigoto 指令表无此名 → 必须改 |
+| fwidth(x) | 无指令,展开 | `deriv_rtx` + max(abs) + `deriv_rty` + max(abs) + add(fxc 实测 7 指令) |
+| mul(M, v) | dp3/dp4 序列 | M 每行 × v(行 i = 基寄存器 + i),fxc 实测确认 |
+| mul(v, M) | dp3 序列 | v × M 每列(列优先存储下 = 跨寄存器取第 j 分量组装) |
+| (float3x3)x cast | — | float4x4→3x3 取前 3 行 |
+| Texture2DArray 采样 | `sample_c_lz`(非 indexable 变体) | 3 分量 UV(xy+index);资源维度靠透传的原版 dcl_resource |
+| sample 简化格式 | 支持 | 3Dmigoto 注释明确:指令表含非 indexable 变体;M2 部署已验证 |
+
+**已确认 3Dmigoto 汇编器支持**:非 indexable 的 sample/sample_c/sample_c_lz/sample_l/sample_d/sample_b、
+deriv_rtx/deriv_rty、discard_nz/discard_z、if_nz/if_z、switch、movc 等。
+
+**优先级**:1) 修 ddx/ddy + discard 指令名 bug(影响已发布代码) → 2) clip → 3) fwidth → 4) 矩阵(最大,核心需求) → 5) SampleCmpLevelZero/2DArray。
+注意回归是 **12 项**(非另一侧 Agent 说的 17 项)。矩阵语义(cbuffer 列优先)用 fxc 交叉验证防错。
+
+**另一侧 Agent 确认后的最终优先级(2026-08-17)**:
+- P0: ddx/ddy→deriv_rtx/deriv_rty、discard→discard_nz(现有 bug)
+- P0: clip(x)(透明裁剪)
+- P0: mul(M,v) + mul(v,M) + (float3x3)cast —— lilToon 核心,mul(v,M) 确认 9 处高频使用
+- P1: fwidth(AA 关键)
+- P2: Texture2DArray 普通采样(3 分量 UV,可选)—— lilToon 的 LIL_SAMPLE_2D_ARRAY 用普通 Sample 非 SampleCmp
+- 跳过: SampleCmpLevelZero(lilToon 0 次)、矩阵×矩阵(0 次)、GetDimensions(尺寸外传/固定值绕过)
+- 后补: transpose(lilToon 仅 1 处,可拆手动交换索引)
+- 注意:lilToon 矩阵来自 Unity(float4x4),用户需在 HLSLBlend 里绑定游戏 cbuffer 的对应矩阵;
+  矩阵实现要支持 cbuffer 基寄存器(如 cb0[0])。
+
+### lilToon 支持实现记录(2026-08-17,已提交)
+
+已完成:指令名修正(ddx/ddy→deriv_rtx/deriv_rty、discard→discard_nz l(-1))、clip、fwidth、矩阵 mul + cast。
+回归 14/14。**矩阵列优先语义是核心(务必遵守)**:
+
+- **cbuffer 列优先存储**:float4x4 M 绑定 cb0[0],则 base[j] 是 M 的**第 j 列**(不是行)。
+- `mul(M, v)`(矩阵×列向量):输出 i = dot(M 第 i 行, v)。第 i 行 = **跨每个寄存器的第 i 分量**
+  (cb0[0][i], cb0[1][i], cb0[2][i]),需先 mov 组装临时再 dp3。fxc 反汇编证实。
+- `mul(v, M)`(行向量×矩阵):输出 j = dot(v, M 第 j 列) = **直接用 base[j] 寄存器** dp3。
+- 之前把两者实现写反了(把列当行),fxc 交叉验证才发现。
+- **矩阵变量占 rows 个连续寄存器**:HLSLMov float4x4 M = cb0[0] 绑定 base+rows(不发 mov);
+  snippet 里 float3x3 M 声明分配连续临时(alloc_matrix)+ 清零。
+- **寄存器保留**:矩阵绑定后 reserve_regs(base, rows),临时分配跳过,避免后续临时撞矩阵行。
+- **reg_plus 坑**:rN 行偏移曾输出 "r55"(前缀带数字),应只保留非数字前缀("r"+数字)。
+- float4x4(...) 构造、matrix×matrix 仍报错;transpose 后补。ddx/ddy 在 3Dmigoto 是 deriv_rtx/deriv_rty(coarse 默认,无 _coarse 后缀写法)。
+
 ## 参考位置备忘
 
 - DXC:`E:\Project\Open\DirectXShaderCompiler`

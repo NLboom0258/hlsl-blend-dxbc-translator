@@ -76,14 +76,14 @@ hlsl_blend_dxbc_translator.exe -input <文件> [-output <输出.asm>] [-data <�
 
 ## 支持的 HLSL
 
-- **类型**:`float`/`int`/`uint`/`bool`/`double`/`half`/`min16*`、向量和 4x4 以内矩阵
-  (矩阵*运算*暂未实现,会报错而不是输出错误代码)
+- **类型**:`float`/`int`/`uint`/`bool`/`double`/`half`/`min16*`、向量和 4x4 以内矩阵。
+  矩阵运算已支持(`mul(M,v)`、`mul(v,M)`、`(float3x3)` cast),按**列优先**语义,fxc 验证
 - **完整控制流**:`if/else`、`for`、`while`、`switch/case`、`discard`、`break`、`continue`,
   导入函数内任意位置 `return`
 - **int/uint 位运算**、复合赋值(`+=` `&=` `<<=` ...)、前置/后置 `++/--`
 - **采样**:`Sample`、`SampleLevel`、`SampleCmp`、`SampleBias`、`SampleGrad`
-- **约 57 个内置函数**,包括 `normalize`、`smoothstep`(基于 mad,与 fxc 一致)、`mad`、
-  `reflect`、`any/all`、`ddx/ddy`、`fmod`、`radians/degrees` 等
+- **约 59 个内置函数**,包括 `normalize`、`smoothstep`(基于 mad,与 fxc 一致)、`mad`、
+  `reflect`、`clip`、`fwidth`、`any/all`、`ddx/ddy`、`fmod`、`radians/degrees` 等
 - **fxc 标准的浮点比较**(`lt/ge/eq/ne` 用 `and dst, dst, l(0x3f800000)` 归一化——
   DXBC 浮点比较返回 0 或全 1 位/NaN,不是 0.0/1.0,这是标准修法)
 
@@ -97,8 +97,9 @@ hlsl_blend_dxbc_translator.exe -input <文件> [-output <输出.asm>] [-data <�
 
 ## 已知限制
 
-矩阵运算、TextureCube/3D 采样(`sample_cube`)、数组写入/动态索引、`do-while`、`struct`、
-以及少数冷门内置函数(`atan/asin/acos/tan` 级数展开等)尚未实现。完整差距清单记录在项目笔记里。
+TextureCube/3D 采样(`sample_cube`)、数组写入/动态索引、`do-while`、`struct`、`transpose`、
+`mul(M1, M2)`(矩阵×矩阵)、以及少数冷门内置函数(`atan/asin/acos/tan` 级数展开等)尚未实现。
+完整差距清单记录在项目笔记里。
 
 ## 参考
 

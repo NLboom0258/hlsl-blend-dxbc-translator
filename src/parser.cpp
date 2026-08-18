@@ -355,7 +355,6 @@ Expr* Parser::parse_primary() {
         if (peek().kind == TokKind::Ident) {
             Type t;
             if (parse_type_name(peek().text, t) && peek(2).text == ")") {
-                if (t.is_matrix()) { set_error("matrix types not supported"); return nullptr; }
                 ++pos_; ++pos_; ++pos_; // consume ( type )
                 Expr* operand = parse_unary();
                 if (!operand) return nullptr;

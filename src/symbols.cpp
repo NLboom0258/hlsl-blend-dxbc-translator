@@ -44,11 +44,42 @@ std::string SymbolTable::alloc_temp(const std::string& mask) {
         reg_name = "r" + std::to_string(free_list_.back());
         free_list_.pop_back();
     } else {
+        while (reserved_.count(next_reg_)) ++next_reg_;
         reg_name = "r" + std::to_string(next_reg_++);
     }
     allocated_bases_.insert(reg_name);
     all_bases_ever_.insert(reg_name);
     return reg_name + "." + mask;
+}
+
+void SymbolTable::reserve_regs(const std::string& base, int rows) {
+    if (base.size() < 2 || base[0] != 'r') return;  // only rN temp domain
+    int n = std::atoi(base.c_str() + 1);
+    for (int i = 0; i < rows; ++i) reserved_.insert(n + i);
+}
+
+std::string SymbolTable::alloc_matrix(int rows) {
+    while (reserved_.count(next_reg_)) ++next_reg_;
+    std::string base = "r" + std::to_string(next_reg_);
+    for (int i = 0; i < rows; ++i) {
+        std::string b = "r" + std::to_string(next_reg_ + i);
+        allocated_bases_.insert(b);
+        all_bases_ever_.insert(b);
+    }
+    next_reg_ += rows;
+    return base;
+}
+
+void SymbolTable::free_matrix(const std::string& base, int rows) {
+    int n = std::atoi(base.c_str() + 1);
+    for (int i = 0; i < rows; ++i) {
+        std::string b = "r" + std::to_string(n + i);
+        if (allocated_bases_.count(b)) {
+            allocated_bases_.erase(b);
+            if (std::find(free_list_.begin(), free_list_.end(), n + i) == free_list_.end())
+                free_list_.push_back(n + i);
+        }
+    }
 }
 
 void SymbolTable::free_temp(const std::string& reg_str) {
@@ -83,8 +114,12 @@ void SymbolTable::enter_scope() {
 void SymbolTable::exit_scope() {
     if (scopes_.size() <= 1) return;  // never pop the global scope
     for (const auto& kv : scopes_.back()) {
-        if (kv.second.is_temp)
-            free_temp(kv.second.reg);
+        if (kv.second.is_temp) {
+            if (kv.second.type.is_matrix())
+                free_matrix(kv.second.reg, kv.second.type.rows);
+            else
+                free_temp(kv.second.reg);
+        }
     }
     scopes_.pop_back();
 }

@@ -32,8 +32,16 @@ public:
 
     // Allocate a temp register with the given writemask. Returns "rN.mask".
     std::string alloc_temp(const std::string& mask);
+    // Allocate `rows` consecutive temp registers (for a matrix variable).
+    // Returns the base register name ("rN").
+    std::string alloc_matrix(int rows);
+    // Reserve register numbers used by an externally-bound matrix (rN..rN+rows-1)
+    // so temp allocation skips them.
+    void reserve_regs(const std::string& base, int rows);
     // Free a temp register (accepts "rN.mask" or "rN").
     void free_temp(const std::string& reg_str);
+    // Free `rows` consecutive registers starting at base ("rN").
+    void free_matrix(const std::string& base, int rows);
 
     // Declare a variable binding (temp or external register) in the current scope.
     void declare(const std::string& name, const std::string& reg, const std::string& mask,
@@ -59,6 +67,7 @@ private:
     int min_reg_;
     int next_reg_;
     std::vector<int> free_list_;       // reusable register numbers (LIFO)
+    std::set<int> reserved_;           // registers reserved by external matrix binds
     std::vector<std::map<std::string, Symbol>> scopes_;  // scope stack (innermost last)
     std::set<std::string> allocated_bases_;    // currently-allocated rN bases
     std::set<std::string> all_bases_ever_;     // every rN base ever allocated

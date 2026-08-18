@@ -88,8 +88,12 @@ public:
 
     // Dest mask from a target string ("r5.xy" -> "xy").
     static std::string target_mask_of(const std::string& target);
+    // Register of the i-th row of a matrix variable: "r5" -> "r6",
+    // "cb0[3]" -> "cb0[4]".
+    static std::string reg_plus(const std::string& base, int i);
 
     const std::string& error() const { return error_; }
+    void set_error(const std::string& s) { error_ = s; }
 
     SymbolTable& sym;
 

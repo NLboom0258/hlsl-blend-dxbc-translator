@@ -60,7 +60,104 @@ static bool unary_intrinsic(CodeGen& cg, Expr* call, const std::string& target, 
 
 static bool iadd(CodeGen& cg, Expr* c, const std::string& t) { return bin_intrinsic(cg, c, t, "add"); }
 static bool isub(CodeGen& cg, Expr* c, const std::string& t) { return bin_intrinsic(cg, c, t, "add"); }
-static bool imul(CodeGen& cg, Expr* c, const std::string& t) { return bin_intrinsic(cg, c, t, "mul"); }
+// ---- Matrix multiplication --------------------------------------------------
+// mul(M, v) and mul(v, M) lower to dp3/dp4 sequences. A matrix operand is a
+// matrix-typed variable, or a (float3x3)x cast of one; its rows occupy
+// consecutive registers starting at the symbol's base.
+
+struct MatrixView {
+    bool valid = false;
+    std::string base;  // register base of row 0 ("r5", "cb0[0]")
+    int rows = 0;
+    int cols = 0;
+};
+
+static MatrixView matrix_view(CodeGen& cg, Expr* e) {
+    MatrixView mv;
+    Symbol* s = nullptr;
+    if (e->kind == Expr::Kind::VarRef) {
+        s = cg.sym.lookup(e->name);
+        if (s && s->type.is_matrix()) {
+            mv.valid = true;
+            mv.base = s->reg;
+            mv.rows = s->type.rows;
+            mv.cols = s->type.cols;
+        }
+    } else if (e->kind == Expr::Kind::Cast && e->cast_type.is_matrix()) {
+        // (float3x3)M : operand must be a matrix variable.
+        Expr* inner = e->operand;
+        if (inner && inner->kind == Expr::Kind::VarRef) {
+            s = cg.sym.lookup(inner->name);
+            if (s && s->type.is_matrix()) {
+                mv.valid = true;
+                mv.base = s->reg;
+                mv.rows = e->cast_type.rows;
+                mv.cols = e->cast_type.cols;
+            }
+        }
+    }
+    return mv;
+}
+
+// mul(M, v): output component i = dot(M row i, v). Under column-major
+// storage (cbuffer convention), row i spans the i-th component of each of the
+// `cols` consecutive registers, so each row is assembled into a temp first.
+static bool gen_matrix_mul_vec(CodeGen& cg, const MatrixView& mv, Expr* v,
+                               const std::string& target) {
+    std::vector<std::string> temps;
+    Operand op;
+    if (!cg.eval(v, op, temps)) return false;
+    std::string dm = dst_mask(target);
+    std::string smask = mv.cols == 4 ? "xyzw" : "xyz";
+    const char* dp = mv.cols == 4 ? "dp4" : "dp3";
+    std::string tbase = target.substr(0, target.find('.'));
+    std::string t = cg.alloc_temp(smask, temps);
+    std::string tb = t.substr(0, t.find('.'));
+    int n = std::min(mv.rows, (int)dm.size());
+    for (int i = 0; i < n; ++i) {
+        char comp = smask[i];
+        for (int j = 0; j < mv.cols; ++j) {
+            std::string col = CodeGen::reg_plus(mv.base, j);
+            cg.emit("mov " + tb + "." + std::string(1, smask[j]) + ", " +
+                    cg.format_src(col, std::string(1, comp), std::string(1, smask[j])));
+        }
+        cg.emit(std::string(dp) + " " + tbase + "." + std::string(1, "xyzw"[i]) + ", " +
+                cg.format_src(tb, smask, smask) + ", " + cg.fmt_operand(op, smask));
+    }
+    for (auto& tt : temps) cg.sym.free_temp(tt);
+    return true;
+}
+
+// mul(v, M): output component j = dot(v, M column j). Under column-major
+// storage, column j is the j-th consecutive register directly.
+static bool gen_vec_mul_matrix(CodeGen& cg, Expr* v, const MatrixView& mv,
+                               const std::string& target) {
+    std::vector<std::string> temps;
+    Operand op;
+    if (!cg.eval(v, op, temps)) return false;
+    std::string dm = dst_mask(target);
+    std::string smask = mv.cols == 4 ? "xyzw" : "xyz";
+    const char* dp = mv.cols == 4 ? "dp4" : "dp3";
+    std::string tbase = target.substr(0, target.find('.'));
+    int n = std::min(mv.cols, (int)dm.size());
+    for (int j = 0; j < n; ++j) {
+        std::string col = CodeGen::reg_plus(mv.base, j);
+        cg.emit(std::string(dp) + " " + tbase + "." + std::string(1, "xyzw"[j]) + ", " +
+                cg.fmt_operand(op, smask) + ", " + cg.format_src(col, smask, smask));
+    }
+    for (auto& tt : temps) cg.sym.free_temp(tt);
+    return true;
+}
+
+static bool imul(CodeGen& cg, Expr* call, const std::string& target) {
+    if (!check_args(call, 2)) return false;
+    MatrixView m0 = matrix_view(cg, call->args[0]);
+    MatrixView m1 = matrix_view(cg, call->args[1]);
+    if (m0.valid && m1.valid) { cg.set_error("matrix * matrix not supported"); return false; }
+    if (m0.valid) return gen_matrix_mul_vec(cg, m0, call->args[1], target);
+    if (m1.valid) return gen_vec_mul_matrix(cg, call->args[0], m1, target);
+    return bin_intrinsic(cg, call, target, "mul");
+}
 static bool idiv(CodeGen& cg, Expr* c, const std::string& t) { return bin_intrinsic(cg, c, t, "div"); }
 static bool imax(CodeGen& cg, Expr* c, const std::string& t) { return bin_intrinsic(cg, c, t, "max"); }
 static bool imin(CodeGen& cg, Expr* c, const std::string& t) { return bin_intrinsic(cg, c, t, "min"); }
@@ -84,8 +181,8 @@ static bool inot(CodeGen& cg, Expr* call, const std::string& target) {
 
 static bool isqrt(CodeGen& cg, Expr* c, const std::string& t) { return unary_intrinsic(cg, c, t, "sqrt"); }
 static bool irsqrt(CodeGen& cg, Expr* c, const std::string& t) { return unary_intrinsic(cg, c, t, "rsq"); }
-static bool iddx(CodeGen& cg, Expr* c, const std::string& t) { return unary_intrinsic(cg, c, t, "ddx"); }
-static bool iddy(CodeGen& cg, Expr* c, const std::string& t) { return unary_intrinsic(cg, c, t, "ddy"); }
+static bool iddx(CodeGen& cg, Expr* c, const std::string& t) { return unary_intrinsic(cg, c, t, "deriv_rtx"); }
+static bool iddy(CodeGen& cg, Expr* c, const std::string& t) { return unary_intrinsic(cg, c, t, "deriv_rty"); }
 static bool ircp(CodeGen& cg, Expr* c, const std::string& t) { return unary_intrinsic(cg, c, t, "rcp"); }
 static bool ifloor(CodeGen& cg, Expr* c, const std::string& t) { return unary_intrinsic(cg, c, t, "round_ni"); }
 static bool iceil(CodeGen& cg, Expr* c, const std::string& t) { return unary_intrinsic(cg, c, t, "round_pi"); }
@@ -411,6 +508,41 @@ static bool ireflect(CodeGen& cg, Expr* call, const std::string& target) {
     return true;
 }
 
+static bool iclip(CodeGen& cg, Expr* call, const std::string& target) {
+    // clip(x): discard the pixel when x < 0. Matches fxc:
+    //   lt t, x, l(0.0) ; discard_nz t  (no 0/1 normalization needed)
+    if (!check_args(call, 1)) return false;
+    std::vector<std::string> temps;
+    Operand a;
+    if (!cg.eval(call->args[0], a, temps)) return false;
+    std::string t = cg.alloc_temp("x", temps);
+    cg.emit("lt " + t + ", " + cg.fmt_operand(a, "x") + ", l(0.0)");
+    cg.emit("discard_nz " + t);
+    for (auto& tt : temps) cg.sym.free_temp(tt);
+    return true;
+}
+
+static bool ifwidth(CodeGen& cg, Expr* call, const std::string& target) {
+    // fwidth(x) = abs(ddx(x)) + abs(ddy(x)). DXBC has no fwidth instruction;
+    // matches fxc's expansion using deriv_rtx/deriv_rty.
+    if (!check_args(call, 1)) return false;
+    std::vector<std::string> temps;
+    Operand a;
+    if (!cg.eval(call->args[0], a, temps)) return false;
+    std::string dm = dst_mask(target);
+    std::string t = cg.alloc_temp(dm, temps);
+    std::string tb = t.substr(0, t.find('.'));
+    cg.emit("deriv_rtx " + t + ", " + cg.fmt_operand(a, dm));
+    cg.emit("max " + t + ", " + cg.format_src(tb, dm, dm) + ", -" + cg.format_src(tb, dm, dm));
+    std::string u = cg.alloc_temp(dm, temps);
+    std::string ub = u.substr(0, u.find('.'));
+    cg.emit("deriv_rty " + u + ", " + cg.fmt_operand(a, dm));
+    cg.emit("max " + u + ", " + cg.format_src(ub, dm, dm) + ", -" + cg.format_src(ub, dm, dm));
+    cg.emit("add " + target + ", " + cg.format_src(tb, dm, dm) + ", " + cg.format_src(ub, dm, dm));
+    for (auto& tt : temps) cg.sym.free_temp(tt);
+    return true;
+}
+
 static bool ipow(CodeGen& cg, Expr* call, const std::string& target) {
     if (!check_args(call, 2)) return false;
     // Constant small integer exponent: expand to repeated multiplication
@@ -643,6 +775,8 @@ const std::vector<std::pair<std::string, IntrinsicInfo>>& intrinsic_table() {
         {"min", {imin, "float"}},
         {"clamp", {iclamp, "float", 3}},
         {"saturate", {isaturate, "float", 1}},
+        {"clip", {iclip, "void", 1}},
+        {"fwidth", {ifwidth, "float", 1}},
         {"abs", {iabs, "float", 1}},
         {"sqrt", {isqrt, "float", 1}},
         {"rsqrt", {irsqrt, "float", 1}},
